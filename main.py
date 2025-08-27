@@ -119,6 +119,7 @@ class login(ctk.CTkFrame):
                 return
 
             result = auth.login(self.username.get(), self.password.get())
+            print(result)
             if result['status']:
                 self.controller.user = result['user']
                 with open('user_data.json', 'w', encoding='utf-8') as f:

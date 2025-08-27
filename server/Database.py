@@ -6,8 +6,8 @@ class Database:
             self.conn  = mysql.connector.connect(
                 host ='localhost',
                 port = '5000',
-                user = 'root',
-                password = 'root',
+                user = 'ctnphrae_medic',
+                password = 'ctnphrae_medic',
                 database = 'ctnphrae_medic',
             )
 
