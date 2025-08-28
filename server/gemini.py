@@ -1,10 +1,12 @@
-from server.Database import Database
+# from server.Database import Database
 from google import genai
-from mysql.connector import Error
+# from mysql.connector import Error
 import re
+import requests
+
 class Gemini:
     def __init__(self):
-         self.Database = Database()
+        #  self.Database = Database()
          #กำหนด apikey
          self.client = genai.Client(api_key="AIzaSyBg-_YMe9T9tyau32USnJ92ziwAX15wj_c")
     #ฟังชั่นคำเเนะนำ
@@ -61,16 +63,35 @@ class Gemini:
              Adivce = re.sub(r'\*+', '',response.text) 
             
              #sql สำหรับบันทึกคำเเนะนำลงไปในฐานข้อมูล
-             sql = '''INSERT INTO tb_heart (systolic_pressure,diastolic_pressure,pulse_rate,heart_report,id) VALUES(%s,%s,%s,%s,%s)'''
 
-             self.Database.cursor.execute(sql,(Systolic,Diastolic,Pulse,Adivce,id))
-             self.Database.conn.commit()
+             saveadvice_url = 'http://medic.ctnphrae.com/php/api/saveadvice.php'
+
+             payload = {
+                    'systolic_pressure': Systolic,
+                    'diastolic_pressure': Diastolic,
+                    'pulse_rate': Pulse,
+                    'Adivce': Adivce,
+                    'id': id
+             }
+
+             response = requests.post(saveadvice_url, json=payload)
+             responseformat = response.json()
+
+             if responseformat['status']:
+               return  {'status':True,'Advice':Adivce,'message':responseformat['message']} 
+             else:
+                return  {'status':False,'message':responseformat['message']}
+# ------------------------------------- lib ทดสอบ ---------------------------------------------
+            #  sql = '''INSERT INTO tb_heart (systolic_pressure,diastolic_pressure,pulse_rate,heart_report,id) VALUES(%s,%s,%s,%s,%s)'''
+
+            #  self.Database.cursor.execute(sql,(Systolic,Diastolic,Pulse,Adivce,id))
+            #  self.Database.conn.commit()
             
-             return {'status':True,'Advice':Adivce,'message':''}   
+            #  return {'status':True,'Advice':Adivce,'message':''}   
+# ------------------------------------- lib ทดสอบ ---------------------------------------------
+        except:
+            return {'status':False,'message':'เกิดข้อผิดพลาดในการประมวลผลคำ'}    
 
-        except Error as e:
-            return {'status':False,'message':{e}}    
-          
     def Advice(self,prompts):
         try:
         
@@ -86,5 +107,5 @@ class Gemini:
 
              return Advice
 
-        except Error as e:
-            return {'status':False,'message':{e}}    
+        except:
+            return {'status':False,'message':'เกิดข้อผิดพลาดในการประมวลผลคำ'}    

@@ -499,7 +499,7 @@ class Frame4(ctk.CTkFrame):
             💓 ความดันต่ำ: {self.diastolic_var.get()} mmHg\n
             💓 ชีพจร: {self.pulse_var.get()} bpm
             '''
-            sendtoTelegram(message, self.controller.user['telegram_key'], self.controller.user['telegram_id'])
+            # sendtoTelegram(message, self.controller.user['telegram_key'], self.controller.user['telegram_id'])
             if len(self.systolic_var.get().strip())== 0 and len(self.diastolic_var.get().strip()) == 0 and len(self.pulse_var.get().strip()) == 0:
                 print('กรุณากรอกข้อมูลให้ครบถ้วน')
                 return
@@ -1229,7 +1229,6 @@ class info(ctk.CTkFrame):
                 self.entry_telegram_id.get(),
                 self.entry_telegram_group.get()
             )
-            print(success)
             if success['status']:
                 print(success['message'])
                 controller.show_frame(HomePage)
@@ -1288,7 +1287,7 @@ class MedicationScheduleFrame(ctk.CTkFrame):
                 return
 
             setting_time = set_dispensing_time.set_time(self.controller.user['device_id'], date_entry.get(), end_entry.get())
-            if setting_time['status']:
+            if setting_time['status'] :
                 print(setting_time['message'])
                 controller.show_frame(MedicationApp)
             else:

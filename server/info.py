@@ -44,17 +44,36 @@ class infoData :
 # ----------------  lib ตัวทดสอบ-----------------------------
     #ฟังชั่นในการอัพเดตข้อมูลผู้ใช้งาน
     def updateData(self,id,device_id,lineid,telegram_key,telegram_id,url2):
-        try:
-            #ทำกาอัพเดตข้อมูล line_id ที่ตาราง  user ก่อน
-            sql1 = '''UPDATE user SET line_id = %s WHERE id = %s'''
-            self.Database.cursor.execute(sql1, (lineid, id))
-            #จากนั้น อัพเดตข้อมูลลงในตาราง tb_device ตัวเครื่อง
-            sql2 = '''UPDATE tb_device SET telegram_key = %s ,telegram_id= %s, url2 = %s WHERE id = %s AND device_id = %s'''
-            
-            self.Database.cursor.execute(sql2,(telegram_key, telegram_id, url2, id, device_id))    
-            self.Database.conn.commit();
+         
+         update_url = 'http://medic.ctnphrae.com/php/api/updateinfo.php'
 
-            return {'status':True ,'message':'อัพเดตข้อมูลสำเร็จ'}
+         newdata = {
+              "id": id,
+              "device_id": device_id,
+              "line_id": lineid,
+              "telegram_key": telegram_key,
+              "telegram_id": telegram_id,
+              "url2": url2
+         }
+
+         response = requests.post(update_url, json=newdata)
+         return response.json()
+
+         
+
+# -------------------------- lib ตัวทดสอบ -----------------------------------
+        # try:
+        #     #ทำกาอัพเดตข้อมูล line_id ที่ตาราง  user ก่อน
+        #     sql1 = '''UPDATE user SET line_id = %s WHERE id = %s'''
+        #     self.Database.cursor.execute(sql1, (lineid, id))
+        #     #จากนั้น อัพเดตข้อมูลลงในตาราง tb_device ตัวเครื่อง
+        #     sql2 = '''UPDATE tb_device SET telegram_key = %s ,telegram_id= %s, url2 = %s WHERE id = %s AND device_id = %s'''
+            
+        #     self.Database.cursor.execute(sql2,(telegram_key, telegram_id, url2, id, device_id))    
+        #     self.Database.conn.commit();
+
+        #     return {'status':True ,'message':'อัพเดตข้อมูลสำเร็จ'}
         
-        except Error as e :
-              return {'status':False ,'message':{e}}
+        # except Error as e :
+        #       return {'status':False ,'message':{e}}
+# -------------------------- lib ตัวทดสอบ -----------------------------------
