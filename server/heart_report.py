@@ -1,22 +1,49 @@
-from server.Database import Database
-from mysql.connector import Error
+# from server.Database import Database
+# from mysql.connector import Error
 from server.gemini import Gemini
 from datetime import datetime
-
+import requests
 class heart_report:
     def __init__(self):
-        self.Database = Database()
+        # self.Database = Database()
         self.gemini = Gemini()
 
     def get_heart_data(self, id):
-        try:
-            sql = 'SELECT * FROM tb_heart WHERE id = %s ORDER BY date DESC'
-            self.Database.cursor.execute(sql, (id,))
-            Data = self.Database.cursor.fetchall()
-            return {'status': True, 'Data': Data}
-        except Error as e:
-            return {'status': False, 'message': e}
 
+        heart_report_url = 'http://medic.ctnphrae.com/php/api/heart_report.php'
+
+        payload_id = {
+            'id': id
+        }
+
+        response = requests.get(heart_report_url, json=payload_id)
+
+        return response.json()
+    
+    def get_heart_advice(self,heart_id):
+
+        heart_advice_url = 'http://medic.ctnphrae.com/php/api/get_advice.php'
+
+        payload_heard_id = {
+            'heart_id': heart_id
+        }
+
+        response = requests.get(heart_advice_url, json=payload_heard_id)
+
+        result = response.json()
+        if result['status']:
+            return result['message']
+        else:
+            return result['message']
+        # ------------------------------------ lib ทดสอบ ------------------------------------------
+        # try:
+        #     sql = 'SELECT heart_id, systolic_pressure, diastolic_pressure, pulse_rate FROM tb_heart WHERE id = %s ORDER BY date DESC'
+        #     self.Database.cursor.execute(sql, (id,))
+        #     Data = self.Database.cursor.fetchall()
+        #     return {'status': True, 'Data': Data}
+        # except Error as e:
+        #     return {'status': False, 'message': e}
+        # ------------------------------------ lib ทดสอบ ------------------------------------------
     def format_heart_data_for_ai(self, data):
         lines = []
         for row in data:
@@ -35,19 +62,21 @@ class heart_report:
         if not result['status']:
             return result
 
-        data = result['Data']
-        advices = []
+        data = result['data']
+        formatted_data = self.format_heart_data_for_ai(data)
 
-        # สร้างคำแนะนำแยกตามแต่ละ heart_id
-        for row in data:
-            heart_id = row['heart_id']
-            prompt = (
-                f"ข้อมูลนี้คือค่าความดันโลหิตและชีพจรของคุณในวันที่ {row['date']} : "
-                f"ความดันโลหิต {row['systolic_pressure']}/{row['diastolic_pressure']} mmHg, "
-                f"ชีพจร {row['pulse_rate']} bpm\n"
-                "กรุณาสรุปภาพรวมสุขภาพและให้คำแนะนำในการดูแลตัวเอง"
-            )
-            advice = self.gemini.Advice(prompt)  # เรียกใช้ AI เพื่อให้คำแนะนำ
-            advices.append({'heart_id': heart_id, 'advice': advice})
+         # สร้าง prompt ให้ AI วิเคราะห์ข้อมูลภาพรวม
+        prompt = (
+                   f"นี่คือข้อมูลค่าความดันโลหิตและชีพจรของคุณ:\n\n{formatted_data}\n\n"
+                    "กรุณาสรุปภาพรวมสุขภาพจากข้อมูลทั้งหมด และให้คำแนะนำในการดูแลตัวเอง "
+                    "เช่น การพบแพทย์ การปรับเปลี่ยนพฤติกรรมการใช้ชีวิต และการติดตามผล"
+         )
 
-        return {'status': True, 'advices': advices, 'data': data}
+        # เรียกใช้ AI ให้วิเคราะห์ภาพรวม
+        advice = self.gemini.Advice(prompt)
+
+        return {
+        'status': True,
+        'advices': advice,  # สรุปภาพรวมเพียงชุดเดียว
+        'data': data
+    }

@@ -1699,7 +1699,7 @@ class Report2(ctk.CTkFrame):
             heart_id = row['heart_id']
 
             # Find the corresponding advice for the heart_id from advices
-            advice_text = next((a['advice'] for a in advices if a['heart_id'] == heart_id), "ไม่พบคำแนะนำ")
+            advice_text = heart_report().get_heart_advice(heart_id)
 
             # Create a button to show advice
             for col, val in enumerate(values):
