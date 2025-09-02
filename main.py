@@ -28,6 +28,7 @@ from server.setting_time import setting_eat_time
 from server.gemini import Gemini
 from server.heart_report import heart_report
 from server.eat_medicine_report import eat_medicine_report
+from server.exportpdf import generate_pdf_sync
 auth = auth()
 manageData = infoData()
 manageMedic = manageMedicData()
@@ -147,6 +148,10 @@ class login(ctk.CTkFrame):
 class HomePage(ctk.CTkFrame):
     def on_show(self):
         print("HomePage is now visible")
+        # อัพเดทข้อมูลการตั้งค่ายาเมื่อแสดงหน้า
+        self.update_medication_info()
+        # อัพเดทข้อมูลผู้ใช้เมื่อแสดงหน้า
+        self.update_user_info()
 
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -170,6 +175,12 @@ class HomePage(ctk.CTkFrame):
 
         self.time_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 90, "bold"), fg_color="#d8eeeb", text_color="black")
         self.time_label.place(x=50, y=500)
+
+        # สร้างส่วนแสดงข้อมูลการตั้งค่ายา
+        self.create_medication_display()
+
+        # สร้างส่วนแสดงข้อมูลผู้ใช้
+        self.create_user_info_display()
 
         self.update_datetime()
 
@@ -254,6 +265,307 @@ class HomePage(ctk.CTkFrame):
         response = messagebox.askyesno("ยืนยัน", "คุณต้องการปิดเครื่องหรือไม่?")
         if response:
             os.system("shutdown /s /t 1")
+
+    def create_medication_display(self):
+        # สร้างกรอบสำหรับแสดงข้อมูลการตั้งค่ายา
+        self.medication_frame = ctk.CTkFrame(
+            self,
+            width=550,
+            height=380,
+            corner_radius=20,
+            fg_color="#FFFFFF",
+            bg_color="#1d567b"
+        )
+        # ปรับตำแหน่งจากด้านขวา (x=1250) เป็นด้านซ้าย (x=50)
+        self.medication_frame.place(x=700, y=200)
+
+        # หัวข้อ
+        self.medication_title = ctk.CTkLabel(
+            self.medication_frame,
+            text="การตั้งค่ายา",
+            font=("TH Sarabun New", 36, "bold"),
+            text_color="#1D3557",
+            fg_color="#FFFFFF"
+        )
+        self.medication_title.place(x=20, y=20)
+
+        # สร้างกรอบสำหรับแสดงรายการยา
+        self.medication_list_frame = ctk.CTkScrollableFrame(
+            self.medication_frame,
+            width=520,
+            height=300,
+            fg_color="#F8F9FA",
+            corner_radius=15
+        )
+        self.medication_list_frame.place(x=0, y=70)
+
+        # ตัวแปรสำหรับเก็บข้อมูลยา
+        self.medication_labels = []
+
+        # ปุ่มอัพเดทข้อมูลยา
+        self.refresh_button = ctk.CTkButton(
+            self.medication_frame,
+            text="🔄 อัพเดท",
+            font=("TH Sarabun New", 20, "bold"),
+            fg_color="#40916C",
+            hover_color="#2D6A4F",
+            text_color="white",
+            corner_radius=10,
+            width=100,
+            height=40,
+            command=self.update_medication_info
+        )
+        self.refresh_button.place(x=430, y=20)
+
+        # ปุ่มไปยังหน้าตั้งค่ายา
+        self.setting_button = ctk.CTkButton(
+            self.medication_frame,
+            text="⚙️ ตั้งค่า",
+            font=("TH Sarabun New", 20, "bold"),
+            fg_color="#007BFF",
+            hover_color="#0056B3",
+            text_color="white",
+            corner_radius=10,
+            width=100,
+            height=40,
+            command=lambda: self.controller.show_frame(Frame2)
+        )
+        self.setting_button.place(x=320, y=20)
+
+    def create_user_info_display(self):
+        # สร้างกรอบสำหรับแสดงข้อมูลผู้ใช้
+        self.user_info_frame = ctk.CTkFrame(
+            self,
+            width=300,
+            height=280,
+            corner_radius=20,
+            fg_color="#FFFFFF",
+            bg_color="#1d567b"
+        )
+        # ปรับตำแหน่งจากด้านขวา (x=1250) เป็นด้านซ้าย (x=50) และเลื่อนลงมา
+        self.user_info_frame.place(x=1400, y=200)
+
+        # หัวข้อ
+        self.user_info_title = ctk.CTkLabel(
+            self.user_info_frame,
+            text="ข้อมูลผู้ใช้",
+            font=("TH Sarabun New", 32, "bold"),
+            text_color="#1D3557",
+            fg_color="#FFFFFF"
+        )
+        self.user_info_title.place(x=20, y=20)
+
+        # สร้างกรอบสำหรับแสดงข้อมูล
+        self.user_info_content = ctk.CTkFrame(
+            self.user_info_frame,
+            width=510,
+            height=200,
+            fg_color="#F8F9FA",
+            corner_radius=15
+        )
+        self.user_info_content.place(x=20, y=60)
+
+        # ตัวแปรสำหรับเก็บข้อมูลผู้ใช้
+        self.user_info_labels = []
+
+        # ปุ่มอัพเดทข้อมูลผู้ใช้
+        self.refresh_user_button = ctk.CTkButton(
+            self.user_info_frame,
+            text="🔄 อัพเดท",
+            font=("TH Sarabun New", 18, "bold"),
+            fg_color="#40916C",
+            hover_color="#2D6A4F",
+            text_color="white",
+            corner_radius=10,
+            width=80,
+            height=35,
+            command=self.update_user_info
+        )
+        self.refresh_user_button.place(x=200, y=20)
+
+    def update_user_info(self):
+        try:
+            # ลบข้อมูลเก่า
+            for label in self.user_info_labels:
+                label.destroy()
+            self.user_info_labels.clear()
+
+            # แสดงข้อมูลผู้ใช้
+            if hasattr(self.controller, 'user') and self.controller.user:
+                user = self.controller.user
+                
+                # ข้อมูลพื้นฐาน
+                user_info = []
+                user_info.append(f"👤 ชื่อ: {user.get('firstname_th', '')} {user.get('lastname_th', '')}")
+                user_info.append(f"📧 อีเมล: {user.get('email', '')}")
+                user_info.append(f"📱 เบอร์โทร: {user.get('phone', '')}")
+                user_info.append(f"🏠 ที่อยู่: {user.get('address', '')}")
+                
+                if user.get('chronic_disease'):
+                    user_info.append(f"🏥 โรคประจำตัว: {user.get('chronic_disease', '')}")
+                
+                if user.get('caretaker_name'):
+                    user_info.append(f"👨‍⚕️ ผู้ดูแล: {user.get('caretaker_name', '')}")
+
+                # แสดงข้อมูล
+                for i, info in enumerate(user_info):
+                    info_label = ctk.CTkLabel(
+                        self.user_info_content,
+                        text=info,
+                        font=("TH Sarabun New", 18),
+                        text_color="#495057",
+                        fg_color="#F8F9FA",
+                        wraplength=490,
+                        justify="center"
+                    )
+                    info_label.pack(pady=2, padx=10, anchor="w")
+                    self.user_info_labels.append(info_label)
+            else:
+                # แสดงข้อความเมื่อไม่มีข้อมูลผู้ใช้
+                no_user_label = ctk.CTkLabel(
+                    self.user_info_content,
+                    text="ไม่พบข้อมูลผู้ใช้",
+                    font=("TH Sarabun New", 24),
+                    text_color="#6C757D",
+                    fg_color="#F8F9FA"
+                )
+                no_user_label.pack(pady=50)
+                self.user_info_labels.append(no_user_label)
+                
+        except Exception as e:
+            print(f"เกิดข้อผิดพลาดในการอัพเดทข้อมูลผู้ใช้: {e}")
+
+    def update_medication_info(self):
+        try:
+            # ลบข้อมูลเก่า
+            for label in self.medication_labels:
+                label.destroy()
+            self.medication_labels.clear()
+
+            # ดึงข้อมูลการตั้งค่ายาจาก API
+            if hasattr(self.controller, 'user') and self.controller.user:
+                meal_data = set_dispensing_time.get_meal(
+                    self.controller.user['device_id'],
+                    self.controller.user['id']
+                )
+                
+                # แสดงข้อมูลวันที่เริ่มและสิ้นสุด
+                if hasattr(self.controller, 'user') and self.controller.user:
+                    start_date = self.controller.user.get('startDate', '')
+                    end_date = self.controller.user.get('endDate', '')
+                    
+                    if start_date and end_date:
+                        # แปลงรูปแบบวันที่
+                        try:
+                            start_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+                            end_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
+                            
+                            start_str = start_dt.strftime("%d/%m/%Y")
+                            end_str = end_dt.strftime("%d/%m/%Y")
+                            
+                            date_info = f"📅 วันที่เริ่ม: {start_str}\n📅 วันที่สิ้นสุด: {end_str}"
+                            
+                            date_label = ctk.CTkLabel(
+                                self.medication_list_frame,
+                                text=date_info,
+                                font=("TH Sarabun New", 20),
+                                text_color="#495057",
+                                fg_color="#E9ECEF",
+                                corner_radius=8,
+                                wraplength=470,
+                                justify="center"
+                            )
+                            date_label.pack(pady=(10, 5), padx=10, fill="x")
+                            self.medication_labels.append(date_label)
+                        except:
+                            pass
+                
+                if meal_data and 'data' in meal_data:
+                    medications = meal_data['data']
+                    
+                    if medications:
+                        # แสดงข้อมูลยา
+                        for i, med in enumerate(medications):
+                            # แปลงชื่อมื้อ
+                            meal_names = {
+                                'bb': 'ก่อนนอน',
+                                'bf': 'เช้า',
+                                'lunch': 'กลางวัน',
+                                'dn': 'เย็น'
+                            }
+                            
+                            meal_name = meal_names.get(med.get('source', ''), med.get('source', ''))
+                            time_str = med.get('time', '')
+                            
+                            # สร้างรายการยา
+                            med_list = []
+                            for j in range(1, 5):
+                                med_name = med.get(f'medicine_{j}', '')
+                                if med_name:
+                                    med_list.append(med_name)
+                            
+                            if med_list:
+                                # สร้างข้อความแสดงข้อมูล
+                                display_text = f"⏰ {meal_name}: {time_str}\n"
+                                display_text += "💊 ยา: " + ", ".join(med_list)
+                                
+                                # สร้าง label แสดงข้อมูล
+                                med_label = ctk.CTkLabel(
+                                    self.medication_list_frame,
+                                    text=display_text,
+                                    font=("TH Sarabun New", 22),
+                                    text_color="#2D6A4F",
+                                    fg_color="#E8F6EF",
+                                    corner_radius=10,
+                                    wraplength=470,
+                                    justify="center"
+                                )
+                                med_label.pack(pady=8, padx=10, fill="x")
+                                self.medication_labels.append(med_label)
+                    else:
+                        # แสดงข้อความเมื่อไม่มีข้อมูลยา
+                        no_med_label = ctk.CTkLabel(
+                            self.medication_list_frame,
+                            text="ยังไม่มีการตั้งค่ายา\nกรุณาตั้งค่าที่เมนู 'ข้อมูลยา'",
+                            font=("TH Sarabun New", 26),
+                            text_color="#6C757D",
+                            fg_color="#F8F9FA",
+                            corner_radius=10,
+                            wraplength=470,
+                            justify="center"
+                        )
+                        no_med_label.pack(pady=50, padx=10)
+                        self.medication_labels.append(no_med_label)
+                else:
+                    # แสดงข้อความเมื่อไม่มีข้อมูลยา
+                    no_med_label = ctk.CTkLabel(
+                        self.medication_list_frame,
+                        text="ยังไม่มีการตั้งค่ายา\nกรุณาตั้งค่าที่เมนู 'ข้อมูลยา'",
+                        font=("TH Sarabun New", 26),
+                        text_color="#6C757D",
+                        fg_color="#F8F9FA",
+                        corner_radius=10,
+                        wraplength=470,
+                        justify="center"
+                    )
+                    no_med_label.pack(pady=50, padx=10)
+                    self.medication_labels.append(no_med_label)
+                    
+        except Exception as e:
+            print(f"เกิดข้อผิดพลาดในการอัพเดทข้อมูลยา: {e}")
+            # แสดงข้อความเมื่อเกิดข้อผิดพลาด
+            error_label = ctk.CTkLabel(
+                self.medication_list_frame,
+                text="ไม่สามารถโหลดข้อมูลยาได้\nกรุณาลองใหม่อีกครั้ง",
+                font=("TH Sarabun New", 26),
+                text_color="#DC3545",
+                fg_color="#F8D7DA",
+                corner_radius=10,
+                wraplength=470,
+                justify="center"
+            )
+            error_label.pack(pady=50, padx=10)
+            self.medication_labels.append(error_label)
 
     def update_datetime(self):
         today = datetime.today()
@@ -1517,7 +1829,17 @@ class Report1(ctk.CTkFrame):
             command=lambda: controller.show_frame(HomePage)
         )
         back_button.pack(side="right", padx=10, pady=20)
-
+        self.export_button = ctk.CTkButton(navbar,
+                                    text="ส่งออกเอกสาร",
+                                    width=250,
+                                    height=80,
+                                    corner_radius=25,
+                                    fg_color="#1D3557",
+                                    hover_color="#2A9D8F",
+                                    text_color="white",
+                                    font=("Arial", 28, "bold"),
+                                    command=lambda: None)  # ไม่ทำอะไร
+        self.export_button.pack(side="right", padx=20, pady=5)
         # กรอบตาราง
         self.table_frame = ctk.CTkFrame(self, fg_color="white",bg_color="#1d567b", corner_radius=15)
         self.table_frame.place(relx=0.5, rely=0.15, anchor="n")
@@ -1557,6 +1879,7 @@ class Report1(ctk.CTkFrame):
         self.result = manageData.get(self.userid)
 
         result = medicine_report.get_eatmedic(self.userid)
+        self.export_button.configure(command=lambda: generate_pdf_sync(self.userid,))
         if result['status']:
             self.data = result['data']
             self.page = 1
@@ -1623,42 +1946,100 @@ class Report1(ctk.CTkFrame):
             self.page -= 1
             self.display_table()
 
-class Report2(ctk.CTkFrame):    
-    def on_show(self):
-        print("Report2 is now visible")
-        result = heart_report().generate_advice(self.controller.user['id'])
-        if result['status']:
-            self.display_data(result['data'], result['advices'])  # Display the fetched data
-        else:
-            print("เกิดข้อผิดพลาด:", result['message'])
-
+class Report2(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent)
+        super().__init__(parent, fg_color="white")
         self.controller = controller
 
-        # Background
+        # ✅ Background
         bg_image = Image.open("imgNew/pagereport2.png").resize((1920, 1080), Image.Resampling.LANCZOS)
         bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1920, 1080))
         bg_label = ctk.CTkLabel(self, image=bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-        # Navbar                          
+        # ✅ Navbar
         navbar = ctk.CTkFrame(self, height=200, fg_color="#A8DADC")
         navbar.pack(side="bottom", fill="x")
-        page_title = ctk.CTkLabel(navbar, text="ประวัติการวัดความดัน", font=("Arial", 50, "bold"), text_color="black") 
+
+        page_title = ctk.CTkLabel(navbar, text="ประวัติการวัดความดัน", font=("Arial", 50, "bold"), text_color="black")
         page_title.pack(side="left", padx=20, pady=20)
+
         back_button = ctk.CTkButton(navbar, text="←", width=150, height=100, corner_radius=35,
-                                    fg_color=force_color, hover_color="#FF0000", text_color="white",
+                                    fg_color="#457B9D", hover_color="#FF0000", text_color="white",
                                     font=("Arial", 44, "bold"),
                                     command=lambda: controller.show_frame(HomePage))
         back_button.pack(side="right", padx=10, pady=5)
 
-        # Scrollable Frame for the table
-        self.scroll_frame = ctk.CTkScrollableFrame(self, width=1200, height=700,bg_color="#ffffff", fg_color="#ffffff")
-        self.scroll_frame.place(relx=0.5, rely=0.5, anchor="center")
+        # ✅ ปุ่มส่งออกเอกสาร (แค่โชว์ ไม่ทำงาน)
+        self.export_button = ctk.CTkButton(navbar,
+                                    text="ส่งออกเอกสาร",
+                                    width=250,
+                                    height=80,
+                                    corner_radius=25,
+                                    fg_color="#1D3557",
+                                    hover_color="#2A9D8F",
+                                    text_color="white",
+                                    font=("Arial", 28, "bold"),
+                                    command=lambda: None)  # ไม่ทำอะไร
+        self.export_button.pack(side="right", padx=20, pady=5)
 
-        self.headers = ["ลำดับ", "ความดันสูง", "ความดันต่ำ", "ชีพจร", "คำแนะนำประจำวัน", "วันที่บันทึก"]
+
+        # ✅ กล่องใหญ่สำหรับหัวข้อ + คำแนะนำจาก AI (Card Style)
+        self.advice_card = ctk.CTkFrame(self,
+                                        width=1220,
+                                        height=350,
+                                        fg_color="#FFFFFF",  # สีฟ้าอ่อน
+                                        corner_radius=20)
+        self.advice_card.place(relx=0.5, rely=0.72, anchor="center")
+
+        # ✅ หัวข้อในกล่อง
+        self.advice_title = ctk.CTkLabel(self.advice_card,
+                                         text="คำแนะนำในการดูแลตัวเองและการปรับพฤติกรรมที่เหมาะสม",
+                                         font=("Arial", 22, "bold"),
+                                         text_color="#000000")
+        self.advice_title.pack(pady=(15, 10))  # เว้นบน 15 ล่าง 10
+
+        # ✅ Textbox สำหรับเนื้อหา AI ในกล่องเดียวกัน
+        self.advice_textbox = ctk.CTkTextbox(self.advice_card,
+                                             width=1220,
+                                             height=250,
+                                             wrap="word",
+                                             font=("Arial", 18),
+                                             fg_color="white",
+                                             text_color="black",
+                                             corner_radius=15)
+        self.advice_textbox.insert("1.0", "\nกำลังโหลดข้อมูลจาก AI...")
+        self.advice_textbox.configure(state="disabled")
+        self.advice_textbox.pack(pady=(0, 15))
+
+        # ✅ Scrollable Frame สำหรับตารางข้อมูล
+        self.scroll_frame = ctk.CTkScrollableFrame(self, width=1200, height=350, fg_color="white")
+        self.scroll_frame.place(relx=0.5, rely=0.35, anchor="center")
+
+        self.headers = ["ลำดับ", "ความดันสูง", "ความดันต่ำ", "ชีพจร", "คำแนะนำ", "วันที่บันทึก"]
         self.column_widths = [100, 200, 200, 150, 200, 300]
+
+    # ✅ เรียกตอนแสดงหน้าจอ
+    def on_show(self):
+        print("Report2 is now visible")
+        result = heart_report().generate_advice(self.controller.user['id'])
+        if result['status']:
+            heart_info_json = json.dumps(result['data'], ensure_ascii=False)
+            prompt = f"นี่คือรายงานค่าความดันสูง ความดันต่ำ และค่าชีพจรในแต่ละวัน มีข้อมูลตามนี้: {heart_info_json} ช่วยประเมินโรคที่อาจเกิดขึ้นและให้คำแนะนำในการดูแลตัวเองและการปรับพฤติกรรมที่เหมาะสม"
+
+            gemini = Gemini()
+            ai_text = gemini.Advice(prompt)
+
+            # ✅ อัปเดต Textbox แสดง AI
+            self.advice_textbox.configure(state="normal")
+            self.advice_textbox.delete("1.0", "end")
+            self.advice_textbox.insert("1.0", "\n" + ai_text)  # เว้นบรรทัดให้สวย
+            self.advice_textbox.configure(state="disabled")
+            self.export_button.configure(command=lambda: generate_pdf_sync(self.controller.user['id'],ai_text))
+            # ✅ แสดงตารางข้อมูล
+            self.display_data(result['data'], result['advices'])
+        else:
+            print("เกิดข้อผิดพลาด:", result['message'])
 
     def show_advice_popup(self, advice_text):
         popup = ctk.CTkToplevel(self)
@@ -1666,28 +2047,31 @@ class Report2(ctk.CTkFrame):
         popup.geometry("600x420")
         popup.grab_set()
 
-        label = ctk.CTkLabel(popup, text="คำแนะนำจาก AI", font=("Arial", 24, "bold"))
+        popup.configure(fg_color="white")
+
+        label = ctk.CTkLabel(popup, text="คำแนะนำจาก AI", font=("Arial", 24, "bold"), text_color="black")
         label.pack(pady=10)
 
-        textbox = ctk.CTkTextbox(popup, width=550, height=300, wrap="word", font=("Arial", 18))
+        textbox = ctk.CTkTextbox(popup, width=550, height=300, wrap="word", font=("Arial", 18),
+                                 fg_color="white", text_color="black")
         textbox.insert("1.0", advice_text)
         textbox.configure(state="disabled")
         textbox.pack(pady=10)
 
-        close_btn = ctk.CTkButton(popup, text="ปิด", command=popup.destroy)
+        close_btn = ctk.CTkButton(popup, text="ปิด", command=popup.destroy,
+                                  fg_color="#495057", hover_color="#FF0000", text_color="white")
         close_btn.pack(pady=10)
 
     def display_data(self, data, advices):
-        # Create table headers
         for col, header in enumerate(self.headers):
-            label = ctk.CTkLabel(self.scroll_frame, text=header, font=("Arial", 20, "bold"), text_color="black", width=self.column_widths[col])
+            label = ctk.CTkLabel(self.scroll_frame, text=header, font=("Arial", 20, "bold"),
+                                 text_color="black", width=self.column_widths[col])
             label.grid(row=0, column=col, padx=5, pady=5)
 
-        # Use heart_id to fetch corresponding advice for each record
         for i, row in enumerate(data):
-            systolic = f"{row['systolic_pressure']} mmHg"  # High blood pressure
-            diastolic = f"{row['diastolic_pressure']} mmHg"  # Low blood pressure
-            pulse = f"{row['pulse_rate']} bpm"  # Pulse rate
+            systolic = f"{row['systolic_pressure']} mmHg"
+            diastolic = f"{row['diastolic_pressure']} mmHg"
+            pulse = f"{row['pulse_rate']} bpm"
             try:
                 date = datetime.strptime(str(row['date']), "%Y-%m-%d %H:%M:%S").strftime("%d %B %Y เวลา %H:%M น.")
             except:
@@ -1695,23 +2079,19 @@ class Report2(ctk.CTkFrame):
 
             values = [str(i+1), systolic, diastolic, pulse, None, date]
 
-            # Get advice text for the corresponding heart_id
             heart_id = row['heart_id']
-
-            # Find the corresponding advice for the heart_id from advices
             advice_text = heart_report().get_heart_advice(heart_id)
 
-            # Create a button to show advice
             for col, val in enumerate(values):
-                if col == 4:  # When we reach the "คำแนะนำประจำวัน" column
-                    advice_btn = ctk.CTkButton(self.scroll_frame, text="🔍", width=50, height=35, 
-                                            command=lambda a=advice_text: self.show_advice_popup(a))
+                if col == 4:
+                    advice_btn = ctk.CTkButton(self.scroll_frame, text="🔍", width=50, height=35,
+                                               command=lambda a=advice_text: self.show_advice_popup(a),
+                                               fg_color="#495057", hover_color="#FF0000", text_color="white")
                     advice_btn.grid(row=i+1, column=col, padx=5, pady=5)
                 else:
-                    label = ctk.CTkLabel(self.scroll_frame, text=val, font=("Arial", 18), text_color="black", width=self.column_widths[col])
+                    label = ctk.CTkLabel(self.scroll_frame, text=val, font=("Arial", 18),
+                                         text_color="black", width=self.column_widths[col])
                     label.grid(row=i+1, column=col, padx=5, pady=5)
-                    
-                    
                     
                     
                     
