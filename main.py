@@ -10,6 +10,7 @@ from tkcalendar import Calendar
 from datetime import datetime, timedelta
 from pywifi import PyWiFi
 from babel.dates import format_date
+import threading
 # model format เวลา
 from lib.set_time import default_serializer
 
@@ -1749,15 +1750,15 @@ class ReportFrame(ctk.CTkFrame):
                 print(f"Error: {path} not found.")
 
         # หน้า report (Report1, Report3, Report2 ตามลำดับใหม่)
-        pages = [Report1, Report3, Report2]
-        labels = ["รายงานข้อมูลการจ่ายยา", "รายงานข้อมูลผู้ใช้งาน", "รายงานข้อมูลความดันและชีพจร"]
+        pages = [Report1, Report2]
+        labels = ["รายงานข้อมูลการจ่ายยา", "รายงานข้อมูลความดันและชีพจร"]
 
         # คำนวณให้อยู่ตรงกลางแนวนอน และห่างกัน 20px
         spacing = 250
-        total_width = (3 * btn_size[0]) + (2 * spacing)
+        total_width = (2 * btn_size[0]) + (2 * spacing)
         start_x = (1920 - total_width) // 2
 
-        for i in range(3):
+        for i in range(2):
             x_pos = start_x + i * (btn_size[0] + spacing)
 
             if i + 1 in btn_images:
@@ -2022,6 +2023,16 @@ class Report2(ctk.CTkFrame):
     # ✅ เรียกตอนแสดงหน้าจอ
     def on_show(self):
         print("Report2 is now visible")
+        self.advice_textbox.configure(state="normal")
+        self.advice_textbox.delete("1.0", "end")
+        self.advice_textbox.insert("1.0", "\nกำลังโหลดข้อมูลจาก AI...")
+        self.advice_textbox.configure(state="disabled")
+        for widget in self.scroll_frame.winfo_children():
+            widget.destroy()
+
+        threading.Thread(target=self.load_data_async, daemon=True).start()
+
+    def load_data_async(self):
         result = heart_report().generate_advice(self.controller.user['id'])
         if result['status']:
             heart_info_json = json.dumps(result['data'], ensure_ascii=False)
@@ -2031,16 +2042,21 @@ class Report2(ctk.CTkFrame):
             ai_text = gemini.Advice(prompt)
 
             # ✅ อัปเดต Textbox แสดง AI
-            self.advice_textbox.configure(state="normal")
-            self.advice_textbox.delete("1.0", "end")
-            self.advice_textbox.insert("1.0", "\n" + ai_text)  # เว้นบรรทัดให้สวย
-            self.advice_textbox.configure(state="disabled")
-            self.export_button.configure(command=lambda: generate_pdf_sync(self.controller.user['id'],ai_text))
-            # ✅ แสดงตารางข้อมูล
-            self.display_data(result['data'], result['advices'])
+            self.after(0, lambda: self.update_ui(result, ai_text))
         else:
             print("เกิดข้อผิดพลาด:", result['message'])
+    def update_ui(self, result, ai_text):
+        # อัปเดต AI textbox
+        self.advice_textbox.configure(state="normal")
+        self.advice_textbox.delete("1.0", "end")
+        self.advice_textbox.insert("1.0", "\n" + ai_text)
+        self.advice_textbox.configure(state="disabled")
 
+        # bind ปุ่ม export
+        self.export_button.configure(command=lambda: generate_pdf_sync(self.controller.user['id'], ai_text))
+
+        # แสดงตาราง
+        self.display_data(result['data'], result['advices'])
     def show_advice_popup(self, advice_text):
         popup = ctk.CTkToplevel(self)
         popup.title("คำแนะนำจาก AI")
@@ -2095,78 +2111,78 @@ class Report2(ctk.CTkFrame):
                     
                     
                     
-class Report3(ctk.CTkFrame):
-    def __init__(self, parent, controller):
-        super().__init__(parent)
-        self.controller = controller
+# class Report3(ctk.CTkFrame):
+#     def __init__(self, parent, controller):
+#         super().__init__(parent)
+#         self.controller = controller
 
-        # พื้นหลัง
-        bg_image = Image.open("imgNew/pagereport1.png").resize((1920, 1080), Image.Resampling.LANCZOS)
-        bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1920, 1080))
-        bg_label = ctk.CTkLabel(self, image=bg_ctk_image, text="")
-        bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+#         # พื้นหลัง
+#         bg_image = Image.open("imgNew/pagereport1.png").resize((1920, 1080), Image.Resampling.LANCZOS)
+#         bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1920, 1080))
+#         bg_label = ctk.CTkLabel(self, image=bg_ctk_image, text="")
+#         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-        # กรอบข้อมูล
-        info_frame = ctk.CTkFrame(self, fg_color="#e0e0e0", corner_radius=20)
-        info_frame.place(relx=0.5, rely=0.3, anchor="center")
+#         # กรอบข้อมูล
+#         info_frame = ctk.CTkFrame(self, fg_color="#e0e0e0", corner_radius=20)
+#         info_frame.place(relx=0.5, rely=0.3, anchor="center")
 
-        # หัวข้อ "ข้อมูลผู้ป่วย" อยู่ในกรอบและตรงกลางบนสุด
-        header = ctk.CTkLabel(info_frame, text="ข้อมูลผู้ป่วย", font=("TH Sarabun New", 36, "bold"), text_color="black")
-        header.grid(row=0, column=0, columnspan=4, pady=(20, 10), sticky="n")
+#         # หัวข้อ "ข้อมูลผู้ป่วย" อยู่ในกรอบและตรงกลางบนสุด
+#         header = ctk.CTkLabel(info_frame, text="ข้อมูลผู้ป่วย", font=("TH Sarabun New", 36, "bold"), text_color="black")
+#         header.grid(row=0, column=0, columnspan=4, pady=(20, 10), sticky="n")
 
-        # ข้อมูลฝั่งซ้าย
-        left_data = [
-            ("ชื่อจริง:", "-"),
-            ("วัน / เดือน / ปี:", "-"),
-            ("ที่อยู่:", "-"),
-            ("โรคประจำตัว:", "-")
-        ]
+#         # ข้อมูลฝั่งซ้าย
+#         left_data = [
+#             ("ชื่อจริง:", "-"),
+#             ("วัน / เดือน / ปี:", "-"),
+#             ("ที่อยู่:", "-"),
+#             ("โรคประจำตัว:", "-")
+#         ]
 
-        # ข้อมูลฝั่งขวา
-        right_data = [
-            ("นามสกุล:", "-"),
-            ("เพศ:", "-")
-        ]
+#         # ข้อมูลฝั่งขวา
+#         right_data = [
+#             ("นามสกุล:", "-"),
+#             ("เพศ:", "-")
+#         ]
 
-        # แสดงข้อมูลฝั่งซ้าย (เริ่ม row=1)
-        for i, (label, value) in enumerate(left_data):
-            ctk.CTkLabel(info_frame, text=label, font=("TH Sarabun New", 28, "bold"),
-                         text_color="black", anchor="w", width=200).grid(row=i+1, column=0, padx=20, pady=10, sticky="w")
-            ctk.CTkLabel(info_frame, text=value, font=("TH Sarabun New", 28),
-                         text_color="black", anchor="w", width=300).grid(row=i+1, column=1, padx=10, pady=10, sticky="w")
+#         # แสดงข้อมูลฝั่งซ้าย (เริ่ม row=1)
+#         for i, (label, value) in enumerate(left_data):
+#             ctk.CTkLabel(info_frame, text=label, font=("TH Sarabun New", 28, "bold"),
+#                          text_color="black", anchor="w", width=200).grid(row=i+1, column=0, padx=20, pady=10, sticky="w")
+#             ctk.CTkLabel(info_frame, text=value, font=("TH Sarabun New", 28),
+#                          text_color="black", anchor="w", width=300).grid(row=i+1, column=1, padx=10, pady=10, sticky="w")
 
-        # แสดงข้อมูลฝั่งขวา (เริ่ม row=1 เช่นกัน เพื่อให้เทียบกับฝั่งซ้าย)
-        for i, (label, value) in enumerate(right_data):
-            ctk.CTkLabel(info_frame, text=label, font=("TH Sarabun New", 28, "bold"),
-                         text_color="black", anchor="w", width=200).grid(row=i+1, column=2, padx=40, pady=10, sticky="w")
-            ctk.CTkLabel(info_frame, text=value, font=("TH Sarabun New", 28),
-                         text_color="black", anchor="w", width=300).grid(row=i+1, column=3, padx=10, pady=10, sticky="w")
+#         # แสดงข้อมูลฝั่งขวา (เริ่ม row=1 เช่นกัน เพื่อให้เทียบกับฝั่งซ้าย)
+#         for i, (label, value) in enumerate(right_data):
+#             ctk.CTkLabel(info_frame, text=label, font=("TH Sarabun New", 28, "bold"),
+#                          text_color="black", anchor="w", width=200).grid(row=i+1, column=2, padx=40, pady=10, sticky="w")
+#             ctk.CTkLabel(info_frame, text=value, font=("TH Sarabun New", 28),
+#                          text_color="black", anchor="w", width=300).grid(row=i+1, column=3, padx=10, pady=10, sticky="w")
 
-        # Navbar ด้านล่าง
-        navbar = ctk.CTkFrame(self, height=200, fg_color="#A8DADC")
-        navbar.pack(side="bottom", fill="x")
+#         # Navbar ด้านล่าง
+#         navbar = ctk.CTkFrame(self, height=200, fg_color="#A8DADC")
+#         navbar.pack(side="bottom", fill="x")
 
-        page_title = ctk.CTkLabel(
-            navbar,
-            text="ข้อมูลผู้ใช้งาน",
-            font=("Arial", 50, "bold"),
-            text_color="black"
-        )
-        page_title.pack(side="left", padx=20, pady=20)
+#         page_title = ctk.CTkLabel(
+#             navbar,
+#             text="ข้อมูลผู้ใช้งาน",
+#             font=("Arial", 50, "bold"),
+#             text_color="black"
+#         )
+#         page_title.pack(side="left", padx=20, pady=20)
 
-        back_button = ctk.CTkButton(
-            navbar,
-            text="←",
-            width=150,
-            height=100,
-            corner_radius=35,
-            fg_color=force_color,
-            hover_color="#FF0000",
-            text_color="white",
-            font=("Arial", 44, "bold"),
-            command=lambda: controller.show_frame(HomePage)
-        )
-        back_button.pack(side="right", padx=10, pady=20)
+#         back_button = ctk.CTkButton(
+#             navbar,
+#             text="←",
+#             width=150,
+#             height=100,
+#             corner_radius=35,
+#             fg_color=force_color,
+#             hover_color="#FF0000",
+#             text_color="white",
+#             font=("Arial", 44, "bold"),
+#             command=lambda: controller.show_frame(HomePage)
+#         )
+#         back_button.pack(side="right", padx=10, pady=20)
 
 
 
@@ -2289,7 +2305,7 @@ class MainApp(ctk.CTk):
         self.container.pack(fill="both", expand=True)
         
         self.frames = {}
-        for F in (HomePage, Frame2, Frame3, Frame4, add_Frame, info, MedicationApp, AIgen, MedicationScheduleFrame, ReportFrame, Report1, Report2,Report3, login, Wificonnect):
+        for F in (HomePage, Frame2, Frame3, Frame4, add_Frame, info, MedicationApp, AIgen, MedicationScheduleFrame, ReportFrame, Report1, Report2, login, Wificonnect):
             frame = F(parent=self.container, controller=self)
             self.frames[F] = frame
             frame.place(relwidth=1, relheight=1)
