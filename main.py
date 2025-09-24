@@ -36,11 +36,13 @@ from server.gemini import Gemini
 from server.heart_report import heart_report
 from server.eat_medicine_report import eat_medicine_report
 from server.exportpdf import generate_pdf_sync
+from server.setcounter import SetCounter
 auth = auth()
 manageData = infoData()
 manageMedic = manageMedicData()
 set_dispensing_time = setting_eat_time()
 ai = Gemini()
+set_counter = SetCounter()
 Heart_report = heart_report()
 medicine_report = eat_medicine_report()
 # -----------------------------------------------------
@@ -268,7 +270,7 @@ class HomePage(ctk.CTkFrame):
         bg_image = Image.open("image/home.png").resize((1024, 600), Image.Resampling.LANCZOS)
         self.bg_photo = ImageTk.PhotoImage(bg_image)
         bg_label = ctk.CTkLabel(self, image=self.bg_photo, text="")
-        bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+        bg_label.place(x=0, y=-10, relwidth=1, relheight=1)
 
         # ไอคอน battery และ wifi
         self.add_status_icons()
@@ -276,7 +278,7 @@ class HomePage(ctk.CTkFrame):
         self.create_menu_buttons(controller)
         # วันที่และเวลา
         self.date_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 35, "bold"),bg_color="#000001",fg_color="transparent", text_color="black")
-        self.date_label.place(x=460, y=10)
+        self.date_label.place(x=390, y=10)
         pywinstyles.set_opacity(self.date_label, value=1,color="#000001")
 
         self.time_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 35, "bold"), bg_color="#000001",fg_color="transparent", text_color="black")
@@ -659,6 +661,7 @@ class HomePage(ctk.CTkFrame):
     def reduce_medicine(self, amount=1):
         """ลดจำนวนยา"""
         new_count = max(0, self.medicine_count - amount)  # ไม่ให้ต่ำกว่า 0
+        set_counter.update_counter(self.controller.user['device_id'],self.controller.user['id'],new_count)
         self.update_medicine_count(new_count)
 
     # ฟังก์ชันรีเซ็ตยา
@@ -672,6 +675,7 @@ class HomePage(ctk.CTkFrame):
         
         if response:
             initial_count = 28
+            set_counter.update_counter(self.controller.user['device_id'],self.controller.user['id'],initial_count)
             self.update_medicine_count(initial_count)
             
             # แสดงข้อความยืนยัน
