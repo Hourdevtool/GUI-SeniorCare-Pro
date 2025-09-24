@@ -33,7 +33,14 @@ class setting_eat_time:
             return {'status':False ,'message':formatres['message']}
 
 
+    def delete_time(self,id):
+         delete_time_url = 'http://medic.ctnphrae.com/php/upd.php'
 
+         payload = {
+              "UserID": id
+          }
+         response = requests.post(delete_time_url, json=payload)
+         print(response.json())
 
         # --------------------------lib ทดสอบ ------------------------------------
         # try:
@@ -62,7 +69,9 @@ class setting_eat_time:
         # except Error as e:
         #     return {'status':False ,'message':{e}} 
         # --------------------------lib ทดสอบ ------------------------------------
-        
+
+
+
     #ฟังชั่นการกำหนดเวลาจ่ายยา
     def set_meal(self, device_id, id, meal):
 

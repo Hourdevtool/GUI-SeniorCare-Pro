@@ -259,8 +259,7 @@ class HomePage(ctk.CTkFrame):
         self.update_medication_info()
         # อัพเดทข้อมูลผู้ใช้เมื่อแสดงหน้า
         self.update_user_info()
-        self.create_counter_medicine_display()
-
+        
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
@@ -273,7 +272,6 @@ class HomePage(ctk.CTkFrame):
 
         # ไอคอน battery และ wifi
         self.add_status_icons()
-
         # ปุ่ม
         self.create_menu_buttons(controller)
         # วันที่และเวลา
@@ -290,6 +288,9 @@ class HomePage(ctk.CTkFrame):
 
         # สร้างส่วนแสดงข้อมูลผู้ใช้
         self.create_user_info_display()
+        
+        # สร้างส่วนแสดงจำนวนยาคงเหลือ (เพิ่มบรรทัดนี้)
+        self.create_counter_medicine_display()
      
         self.update_datetime()
 
@@ -446,7 +447,7 @@ class HomePage(ctk.CTkFrame):
             corner_radius=8,
             width=40,
             height=25,
-            command=self.update_medication_info
+            command=self.reset_and_update_threaded
         )
         self.refresh_button.place(x=250, y=8)
 
@@ -538,8 +539,8 @@ class HomePage(ctk.CTkFrame):
         # สร้างกรอบสำหรับแสดงข้อมูล
         self.user_info_content = ctk.CTkScrollableFrame(
             self.user_info_frame,
-            width=250,
-            height=150,
+            width=280,
+            height=230,
             fg_color="#F8F9FA",
             corner_radius=10,
             border_width=1,
@@ -548,8 +549,8 @@ class HomePage(ctk.CTkFrame):
         self.user_info_content.place(x=10, y=60)
 
         self.user_info_labels = []
-    def create_counter_medicine_display(self):
 
+    def create_counter_medicine_display(self):
         self.medicine_frame = ctk.CTkFrame(
             self,
             width=300,
@@ -562,7 +563,7 @@ class HomePage(ctk.CTkFrame):
         )
         self.medicine_frame.place(x=20, y=100)
         pywinstyles.set_opacity(self.medicine_frame, value=1, color="#000001")
-      
+    
         # หัวข้อพร้อมไอคอน
         header_frame = ctk.CTkFrame(
             self.medicine_frame,
@@ -572,6 +573,7 @@ class HomePage(ctk.CTkFrame):
             fg_color="#FFF2E8"
         )
         header_frame.place(x=10, y=10)
+        
         self.reset_counter_button = ctk.CTkButton(
             header_frame,
             text="รีเซ็ต",
@@ -580,25 +582,31 @@ class HomePage(ctk.CTkFrame):
             hover_color="#2D6A4F",
             text_color="white",
             corner_radius=8,
-            width=40,
+            width=60,  # เพิ่มความกว้างให้ปุ่ม
             height=25,
-            command=self.reset_medicine_count
+            command=self.reset_medicine_count  # เอา lambda ออก
         )
         self.reset_counter_button.place(x=200, y=8)
 
-        self.user_info_title = ctk.CTkLabel(
+        self.medicine_title = ctk.CTkLabel(
             header_frame,
             text="จำนวนยาคงเหลือ",
             font=("TH Sarabun New", 25, "bold"),
             text_color="#000000",
             fg_color="transparent"
         )
-        self.user_info_title.place(x=10, y=10)
+        self.medicine_title.place(x=10, y=10)
 
-        # สร้าง Label สำหรับแสดงจำนวนยา (แก้ไขตัวแปรให้ถูกต้อง)
+        # เริ่มต้นค่าตัวแปรสำหรับเก็บจำนวนยา - แก้ไข typo 'uset' เป็น 'user'
+        if hasattr(self.controller, 'user') and self.controller.user and 'count_medicine' in self.controller.user:
+            self.medicine_count = self.controller.user['count_medicine']
+        else:
+            self.medicine_count = 28
+        
+        # สร้าง Label สำหรับแสดงจำนวนยา
         self.counter_medicine = ctk.CTkLabel(
             self.medicine_frame,
-            text= self.controller.user['count_medicine']  or "28",
+            text=str(self.medicine_count),
             width=250,
             height=150,
             fg_color="#F8F9FA",
@@ -607,39 +615,73 @@ class HomePage(ctk.CTkFrame):
             text_color="#2E7D32"
         )
         self.counter_medicine.place(x=25, y=60)
+        
+        print(f"สร้างส่วนแสดงจำนวนยาคงเหลือเสร็จสิ้น: {self.medicine_count} เม็ด")
+    
+    def reset_and_update_threaded(self):
+        def task():
+            try:
+                set_dispensing_time.delete_time(self.controller.user['id'])
+                self.update_medication_info()
+            except Exception as e:
+                print("เกิดข้อผิดพลาด:", e)
 
-        # เริ่มต้นค่าตัวแปรสำหรับเก็บจำนวนยา
-
-        self.medicine_count =  self.controller.user['count_medicine']  or "28"
-
-# ฟังก์ชันสำหรับอัพเดทจำนวนยา
-    def update_medicine_count(self, new_count):
+        threading.Thread(target=task, daemon=True).start()
+    # ฟังก์ชันสำหรับอัพเดทจำนวนยา
+    def update_medicine_count(self, new_count=None):
         """อัพเดทจำนวนยาคงเหลือ"""
-        self.medicine_count = new_count
-        self.counter_medicine.configure(text=str(new_count))
+        if new_count is not None:
+            self.medicine_count = new_count
+            # อัพเดทค่าใน controller.user ด้วย
+            if hasattr(self.controller, 'user') and self.controller.user:
+                self.controller.user['count_medicine'] = self.medicine_count
+        
+        # ตรวจสอบว่ามี controller และ user หรือไม่
+        elif hasattr(self.controller, 'user') and self.controller.user:
+            user_count = self.controller.user.get('count_medicine')
+            if user_count is not None:
+                self.medicine_count = user_count
+        
+        # อัพเดท UI
+        self.counter_medicine.configure(text=str(self.medicine_count))
         
         # เปลี่ยนสีตามจำนวนยา
-        if new_count <= 5:
+        if self.medicine_count <= 5:
             self.counter_medicine.configure(text_color="#D32F2F")  # สีแดง - ยาใกล้หมด
-        elif new_count <= 10:
+        elif self.medicine_count <= 10:
             self.counter_medicine.configure(text_color="#F57C00")  # สีส้ม - ยาเหลือน้อย
         else:
             self.counter_medicine.configure(text_color="#2E7D32")  # สีเขียว - ยาเพียงพอ
+        
+        print(f"อัพเดทจำนวนยา: {self.medicine_count} เม็ด")
 
-# ฟังก์ชันลดยา
+    # ฟังก์ชันลดยา
     def reduce_medicine(self, amount=1):
         """ลดจำนวนยา"""
         new_count = max(0, self.medicine_count - amount)  # ไม่ให้ต่ำกว่า 0
         self.update_medicine_count(new_count)
 
-# ฟังก์ชันรีเซ็ตยา
-    def reset_medicine_count(self, initial_count=28):
+    # ฟังก์ชันรีเซ็ตยา
+    def reset_medicine_count(self):
         """รีเซ็ตจำนวนยากลับไปเป็นค่าเริ่มต้น"""
-        self.update_medicine_count(initial_count)
-
+        # ใช้ messagebox เพื่อยืนยันการรีเซ็ต
+        response = messagebox.askyesno(
+            "ยืนยันการรีเซ็ต", 
+            "คุณต้องการรีเซ็ตจำนวนยาเป็น 28 เม็ดหรือไม่?"
+        )
+        
+        if response:
+            initial_count = 28
+            self.update_medicine_count(initial_count)
+            
+            # แสดงข้อความยืนยัน
+            messagebox.showinfo("สำเร็จ", f"รีเซ็ตจำนวนยาเป็น {initial_count} เม็ดเรียบร้อยแล้ว")
+            print(f"รีเซ็ตจำนวนยาเป็น: {initial_count} เม็ด")
 
     def update_user_info(self):
         try:
+            print("กำลังอัพเดทข้อมูลผู้ใช้...")
+            
             # ลบข้อมูลเก่า
             for label in self.user_info_labels:
                 label.destroy()
@@ -648,17 +690,18 @@ class HomePage(ctk.CTkFrame):
             # แสดงข้อมูลผู้ใช้
             if hasattr(self.controller, 'user') and self.controller.user:
                 user = self.controller.user
+                print(f"พบข้อมูลผู้ใช้: {user.get('firstname_th', '')} {user.get('lastname_th', '')}")
                 
                 # ข้อมูลพื้นฐาน
                 user_info = []
                 user_info.append(f"ผู้ป่วย: {user.get('firstname_th', '')} {user.get('lastname_th', '')}")
-                user_info.append(f"โทรศัพท์ : {user.get('phone', '')}")
+                user_info.append(f"โทรศัพท์: {user.get('phone', '')}")
                 
                 if user.get('chronic_disease'):
-                    user_info.append(f"โรค : {user.get('chronic_disease', '')}")
+                    user_info.append(f"โรค: {user.get('chronic_disease', '')}")
                 
                 if user.get('caretaker_name'):
-                    user_info.append(f"ผู้ดูแล : {user.get('caretaker_name', '')}")
+                    user_info.append(f"ผู้ดูแล: {user.get('caretaker_name', '')}")
 
                 # แสดงข้อมูลในรูปแบบการ์ด
                 for i, info in enumerate(user_info):
@@ -678,10 +721,16 @@ class HomePage(ctk.CTkFrame):
                         fg_color="transparent",
                         justify="left"
                     )
-                    info_label.place(x=10, y=8)
+                    info_label.pack(pady=5, padx=10, fill="x")
+                    
                     self.user_info_labels.append(info_card)
                     self.user_info_labels.append(info_label)
+                    
+                # อัพเดทจำนวนยาด้วย
+                self.update_medicine_count()
+                    
             else:
+                print("ไม่พบข้อมูลผู้ใช้")
                 # แสดงข้อความเมื่อไม่มีข้อมูลผู้ใช้
                 no_user_card = ctk.CTkFrame(
                     self.user_info_content,
@@ -693,24 +742,18 @@ class HomePage(ctk.CTkFrame):
                 )
                 no_user_card.pack(pady=30, padx=10, fill="x")
                 
-                warning_icon = ctk.CTkLabel(
+                warning_label = ctk.CTkLabel(
                     no_user_card,
-                    text="เตือน",
-                    font=("TH Sarabun New", 24),
-                    fg_color="transparent"
-                )
-                warning_icon.place(x=20, y=25)
-                
-                no_user_label = ctk.CTkLabel(
-                    no_user_card,
-                    text="ไม่พบข้อมูลผู้ใช้",
-                    font=("TH Sarabun New", 16, "bold"),
+                    text="⚠️ ไม่พบข้อมูลผู้ใช้",
+                    font=("TH Sarabun New", 18, "bold"),
                     text_color="#856404",
                     fg_color="transparent"
                 )
-                no_user_label.place(x=60, y=30)
+                warning_label.pack(pady=20)
                 
-                self.user_info_labels.extend([no_user_card, warning_icon, no_user_label])
+                self.user_info_labels.extend([no_user_card, warning_label])
+                
+            print("อัพเดทข้อมูลผู้ใช้เสร็จสิ้น")
                 
         except Exception as e:
             print(f"เกิดข้อผิดพลาดในการอัพเดทข้อมูลผู้ใช้: {e}")
@@ -769,9 +812,7 @@ class HomePage(ctk.CTkFrame):
                 
                 if meal_data and 'data' in meal_data:
                     medications = meal_data['data']
-                    # recivetime(medications)
-                    # serial_thread = threading.Thread(target=start_serial_loop, daemon=True)
-                    # serial_thread.start()
+                    
                     if medications:
                         # แสดงข้อมูลยาในรูปแบบการ์ด
                         for i, med in enumerate(medications):
@@ -889,7 +930,7 @@ class HomePage(ctk.CTkFrame):
         self.update_system_status()
         
         # เรียกฟังก์ชันนี้ใหม่ทุก 1 วินาที
-        self.time_label.after(1000, self.update_datetime)
+        self.after(1000, self.update_datetime)
 
     def update_system_status(self):
         """อัพเดทสถานะระบบ"""
@@ -910,73 +951,51 @@ class HomePage(ctk.CTkFrame):
         except:
             pass
 
-    def add_notification_system(self):
-        """เพิ่มระบบแจ้งเตือน"""
-        self.notification_frame = ctk.CTkFrame(
-            self,
-            width=300,
-            height=50,
+    def show_no_medication_message(self):
+        """แสดงข้อความเมื่อไม่มีข้อมูลยา"""
+        no_med_card = ctk.CTkFrame(
+            self.medication_list_frame,
+            height=80,
             corner_radius=10,
-            fg_color="#D4EDDA",
-            bg_color="transparent"
+            fg_color="#FFF3CD",
+            border_width=1,
+            border_color="#FFE69C"
         )
+        no_med_card.pack(pady=30, padx=10, fill="x")
         
-        # ซ่อนการแจ้งเตือนในตอนเริ่มต้น
-        self.notification_frame.place(x=-300, y=100)
-        
-        self.notification_label = ctk.CTkLabel(
-            self.notification_frame,
-            text="",
-            font=("TH Sarabun New", 14, "bold"),
-            text_color="#155724",
+        warning_label = ctk.CTkLabel(
+            no_med_card,
+            text="⚠️ ไม่พบข้อมูลการตั้งค่ายา",
+            font=("TH Sarabun New", 18, "bold"),
+            text_color="#856404",
             fg_color="transparent"
         )
-        self.notification_label.place(x=10, y=15)
+        warning_label.pack(pady=20)
+        
+        self.medication_labels.extend([no_med_card, warning_label])
 
-    def update_datetime(self):
-        """อัพเดทวันที่และเวลาพร้อมเอฟเฟ็กต์"""
-        today = datetime.today()
+    def show_medication_error(self):
+        """แสดงข้อความผิดพลาดเมื่อโหลดข้อมูลยาไม่สำเร็จ"""
+        error_card = ctk.CTkFrame(
+            self.medication_list_frame,
+            height=80,
+            corner_radius=10,
+            fg_color="#F8D7DA",
+            border_width=1,
+            border_color="#F5C6CB"
+        )
+        error_card.pack(pady=30, padx=10, fill="x")
         
-        #จัดรูปแบบวันที่ให้สั้นและเข้าใจง่าย
-        thai_months = [
-            "", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
-            "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
-        ]
+        error_label = ctk.CTkLabel(
+            error_card,
+            text="❌ เกิดข้อผิดพลาดในการโหลดข้อมูลยา",
+            font=("TH Sarabun New", 16, "bold"),
+            text_color="#721C24",
+            fg_color="transparent"
+        )
+        error_label.pack(pady=20)
         
-        thai_days = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
-        
-        day_name = thai_days[today.weekday()]
-        day = today.day
-        month = thai_months[today.month]
-        year = today.year + 543  # แปลงเป็น พ.ศ.
-        
-        date_text = f"{day_name} {day} {month} {year}"
-        self.date_label.configure(text=date_text)
-
-        # จัดรูปแบบเวลาพร้อมวินาที
-        current_time = time.strftime("%H:%M:%S")
-        self.time_label.configure(text=current_time)
-        
-        # เปลี่ยนสีของเวลาตามช่วงเวลา
-        hour = today.hour
-
-        if 6 <= hour < 12:
-            time_color = "#E67E22"  # สีส้ม (เช้า)
-        elif 12 <= hour < 18:
-            time_color = "#F39C12"  # สีเหลือง (บ่าย)
-        elif 18 <= hour < 22:
-            time_color = "#8E44AD"  # สีม่วง (เย็น)
-        else:
-            time_color = "#2C3E50"  # สีเข้ม (กลางคืน)
-            
-        self.time_label.configure(text_color=time_color)
-        
-        # อัพเดทสถานะระบบ
-        self.update_system_status()
-        
-        # เรียกฟังก์ชันนี้ใหม่ทุก 1 วินาที
-        self.time_label.after(1000, self.update_datetime)
-
+        self.medication_labels.extend([error_card, error_label])
 class Frame2(ctk.CTkFrame): 
     def on_show(self):
         print("Frame2 is now visible")
@@ -2136,8 +2155,14 @@ class MedicationApp(ctk.CTkFrame):
         if( insert_meal['status']):
             print(insert_meal['message'])
             self.controller.show_frame(HomePage)
+            meal_data.clear()
+            self.med_combos.clear()
+            self.med_entries = {"เช้า": [], "กลางวัน": [], "เย็น": [], "ก่อนนอน": []}
         else:
             print(insert_meal['message'])
+            meal_data.clear()
+            self.med_combos.clear()
+            self.med_entries = {"เช้า": [], "กลางวัน": [], "เย็น": [], "ก่อนนอน": []}
         
     def on_show(self):
         print("MedicationApp is now visible")
