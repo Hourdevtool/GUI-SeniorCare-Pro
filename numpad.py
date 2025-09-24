@@ -4,14 +4,15 @@ class TimeNumpad(ctk.CTkToplevel):
     def __init__(self, parent, entry):
         super().__init__(parent)
         self.title("Numpad Time")
-        self.geometry("300x400")
+        self.geometry("400x500+350+50")  # ✅ เหมาะกับหน้าหลัก 1024x600
         self.entry = entry
         self.configure(bg="white")
-        self.attributes("-topmost", True)  # ทำให้หน้าต่างอยู่ด้านหน้าตลอด
-        self.protocol("WM_DELETE_WINDOW", self.close_numpad)  # ปิดแล้วคืนค่า
+        self.attributes("-topmost", True)  # หน้าต่างอยู่ด้านหน้าตลอด
+        self.protocol("WM_DELETE_WINDOW", self.close_numpad)
 
-        frame = ctk.CTkFrame(self)
-        frame.pack(pady=10)
+        # === กรอบปุ่มตัวเลข ===
+        frame = ctk.CTkFrame(self, fg_color="#f8f9fa", corner_radius=15)
+        frame.pack(pady=20)
 
         buttons = [
             ("7", 0, 0), ("8", 0, 1), ("9", 0, 2),
@@ -21,49 +22,67 @@ class TimeNumpad(ctk.CTkToplevel):
         ]
 
         for text, row, col in buttons:
-            ctk.CTkButton(frame, text=text, font=("Arial", 20), width=60, height=60, 
-                          command=lambda x=text: self.on_button_click(x)).grid(row=row, column=col, padx=5, pady=5)
+            ctk.CTkButton(
+                frame, text=text, font=("Arial", 28, "bold"),
+                width=80, height=80, corner_radius=15,
+                command=lambda x=text: self.on_button_click(x)
+            ).grid(row=row, column=col, padx=8, pady=8)
 
-        btn_frame = ctk.CTkFrame(self)
-        btn_frame.pack(pady=10)
+        # === ปุ่ม ล้าง / OK ===
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(pady=20)
 
-        ctk.CTkButton(btn_frame, text="🗑 ล้าง", fg_color="red", font=("Arial", 18), width=80, 
-                      command=self.clear_entry).pack(side="left", padx=10)
+        ctk.CTkButton(
+            btn_frame, text="🗑 ล้าง", fg_color="#e63946", hover_color="#d62828",
+            font=("Arial", 24, "bold"), width=120, height=60,
+            corner_radius=15, command=self.clear_entry
+        ).pack(side="left", padx=15)
 
-        ctk.CTkButton(btn_frame, text="✔ OK", fg_color="green", font=("Arial", 18), width=80, 
-                      command=self.close_numpad).pack(side="left", padx=10)
+        ctk.CTkButton(
+            btn_frame, text="✔ OK", fg_color="#2d6a4f", hover_color="#1b4332",
+            font=("Arial", 24, "bold"), width=120, height=60,
+            corner_radius=15, command=self.close_numpad
+        ).pack(side="left", padx=15)
 
     def on_button_click(self, value):
         current_text = self.entry.get()
 
         if value == "⌫":
             self.entry.delete(len(current_text) - 1, "end")
-        elif len(current_text) < 5:  # จำกัดความยาวที่ 5 ตัวอักษร (HH:MM)
+        elif len(current_text) < 5:  # จำกัดความยาว HH:MM
             if len(current_text) == 2 and ":" not in current_text:
-                self.entry.insert("end", ":")  # ใส่ `:` อัตโนมัติ
+                self.entry.insert("end", ":")
             self.entry.insert("end", value)
 
     def clear_entry(self):
-        self.entry.delete(0, "end")  # ล้างข้อมูลในช่องป้อนค่า
+        self.entry.delete(0, "end")
 
     def close_numpad(self):
         text = self.entry.get()
-        if len(text) == 4:  # ถ้าผู้ใช้ใส่แค่ HHMM ให้ใส่ ":" อัตโนมัติ
+        if len(text) == 4:  # ถ้าใส่แค่ HHMM -> แทรก ":"
             self.entry.insert(2, ":")
-        elif len(text) != 5:  # ถ้าใส่ไม่ครบ ให้เคลียร์
+        elif len(text) != 5:
             self.entry.delete(0, "end")
         self.destroy()
 
+
+# === ตัวอย่างการใช้งาน ===
 def open_time_numpad():
     TimeNumpad(root, entry)
 
 root = ctk.CTk()
-root.geometry("400x200")
+root.geometry("1024x600")
 
-entry = ctk.CTkEntry(root, font=("Arial", 24), width=250)
-entry.pack(pady=20)
+entry = ctk.CTkEntry(root, font=("Arial", 32), width=300, height=60)
+entry.pack(pady=40)
 
-btn_open_numpad = ctk.CTkButton(root, text="⏰ เปิด Numpad เวลา", font=("Arial", 20), width=200, command=open_time_numpad)
+btn_open_numpad = ctk.CTkButton(
+    root, text="⏰ เปิด Numpad เวลา",
+    font=("Arial", 28, "bold"),
+    width=250, height=70,
+    corner_radius=20,
+    command=open_time_numpad
+)
 btn_open_numpad.pack()
 
 root.mainloop()
