@@ -98,7 +98,7 @@ class login(ctk.CTkFrame):
         logo_frame = ctk.CTkFrame(
             frame,
             width=60,
-            height=60,
+            height=70,
             corner_radius=15,
             fg_color="#F5F5F5",
             border_width=1,
