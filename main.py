@@ -261,11 +261,11 @@ class HomePage(ctk.CTkFrame):
         self.update_medication_info()
         # อัพเดทข้อมูลผู้ใช้เมื่อแสดงหน้า
         self.update_user_info()
+        self.create_menu_buttons(self.controller)
         
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-
         # พื้นหลัง (ปรับขนาดเป็น 1024x600)
         bg_image = Image.open("image/home.png").resize((1024, 600), Image.Resampling.LANCZOS)
         self.bg_photo = ImageTk.PhotoImage(bg_image)
@@ -274,8 +274,6 @@ class HomePage(ctk.CTkFrame):
 
         # ไอคอน battery และ wifi
         self.add_status_icons()
-        # ปุ่ม
-        self.create_menu_buttons(controller)
         # วันที่และเวลา
         self.date_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 35, "bold"),bg_color="#000001",fg_color="transparent", text_color="black")
         self.date_label.place(x=390, y=10)
@@ -314,16 +312,30 @@ class HomePage(ctk.CTkFrame):
         # ปรับขนาดปุ่มให้เล็กลง
         btn_size = (100, 100)
         btn_images = {}
+        pressure = 0
+        if hasattr(self.controller, 'user') and self.controller.user and 'pressure' in self.controller.user:
+            pressure = self.controller.user['pressure']
 
-        paths = [
-            "imgNew/iconuser.png", "imgNew/icontime.png", "imgNew/iconheath.png",
-            "imgNew/icondog.png", "imgNew/iconreport.png", "imgNew/iconout.png",
-            "imgNew/icondow.png"
-        ]
-        btn_texts = [
-            "ข้อมูลผู้ใช้", "ตั้งเวลา", "สุขภาพ",
-            "ข้อมูลยา", "รายงาน", "ออกระบบ", "ปิดเครื่อง"
-        ]
+        if pressure == 1:
+            paths = [
+                "imgNew/iconuser.png", "imgNew/icontime.png", "imgNew/iconheath.png",
+                "imgNew/icondog.png", "imgNew/iconreport.png", "imgNew/iconout.png",
+                "imgNew/icondow.png"
+            ]
+            btn_texts = [
+                "ข้อมูลผู้ใช้", "ตั้งเวลา", "สุขภาพ",
+                "ข้อมูลยา", "รายงาน", "ออกระบบ", "ปิดเครื่อง"
+            ]
+        else:
+            paths = [
+                "imgNew/iconuser.png", "imgNew/icontime.png",
+                "imgNew/icondog.png", "imgNew/iconreport.png", "imgNew/iconout.png",
+                "imgNew/icondow.png"
+            ]
+            btn_texts = [
+                "ข้อมูลผู้ใช้", "ตั้งเวลา",
+                "ข้อมูลยา", "รายงาน", "ออกระบบ", "ปิดเครื่อง"
+            ]
         pages = [info, Frame3, Frame4, Frame2, ReportFrame, login]
 
         for i, path in enumerate(paths, start=1):
@@ -2648,7 +2660,7 @@ class DatePicker(ctk.CTkFrame):
 class ReportFrame(ctk.CTkFrame):     
     def on_show(self):         
         print("ReportFrame is now visible")      
-    
+        self.create_report_button(self.controller)
     def __init__(self, parent, controller):         
         super().__init__(parent)         
         self.controller = controller          
@@ -2660,25 +2672,62 @@ class ReportFrame(ctk.CTkFrame):
         bg_label.place(x=0, y=0, relwidth=1, relheight=1) 
 
         # ขนาดปุ่มที่เหมาะสมกับหน้าจอขนาด 1024x600
+        
+
+        # Navbar
+        navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
+        navbar.pack(side="bottom", fill="x")     
+        
+        page_title = ctk.CTkLabel(
+            navbar,
+            text="หน้าพิมพ์รายงาน",
+            font=("TH Sarabun New", 28, "bold"),
+            text_color="black"
+        )   
+        page_title.pack(side="left", padx=20)
+        self.reply_ctk_image = ctk.CTkImage(
+            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            size=(24, 24)
+        )    
+
+        back_button = ctk.CTkButton(
+            navbar,
+           image=self.reply_ctk_image,   # ใช้ image แทน text
+            text="ย้อนกลับ",                      # ไม่ใส่ข้อความ
+            width=100, 
+            height=50, 
+            corner_radius=25,
+            fg_color="#2563EB", 
+            hover_color="#1D3557", 
+            text_color="white",
+            font=("Arial", 24, "bold"), 
+            command=lambda: controller.show_frame(HomePage)
+        )
+        back_button.pack(side="right", padx=10, pady=10)
+    def create_report_button(self, controller):
         btn_size = (140, 140)         
-        btn_images = {}         
-        for i, path in enumerate(["imgNew/iconreport2.png", "imgNew/pageuser.png", "imgNew/iconreport1.png"], start=1):             
+        btn_images = {}        
+        if(self.controller.user['pressure'] == 1):
+            pages = [Report1, Report2]         
+            labels = ["รายงานข้อมูลการจ่ายยา", "รายงานข้อมูลความดันและชีพจร"]  
+            imgpath = ["imgNew/iconreport2.png", "imgNew/pageuser.png", "imgNew/iconreport1.png"]
+        else:
+            pages = [Report1]         
+            labels = ["รายงานข้อมูลการจ่ายยา"]  
+            imgpath = ["imgNew/iconreport2.png"]
+        for i, path in enumerate(imgpath, start=1):             
             try:                 
                 img = Image.open(path).resize(btn_size, Image.Resampling.LANCZOS)                 
                 btn_images[i] = ImageTk.PhotoImage(img)             
             except FileNotFoundError:                 
                 print(f"Error: {path} not found.") 
 
-        # หน้า report (Report1, Report3, Report2 ตามลำดับใหม่)         
-        pages = [Report1, Report2]         
-        labels = ["รายงานข้อมูลการจ่ายยา", "รายงานข้อมูลความดันและชีพจร"]          
-        
         # คำนวณให้อยู่ตรงกลางแนวนอนสำหรับหน้าจอ 1024px
         spacing = 180         
         total_width = (2 * btn_size[0]) + spacing         
         start_x = (1024 - total_width) // 2          
         
-        for i in range(2):             
+        for i in range(len(pages)):             
             x_pos = start_x + i * (btn_size[0] + spacing)
 
             if i + 1 in btn_images:                 
@@ -2712,37 +2761,6 @@ class ReportFrame(ctk.CTkFrame):
             )             
             label.place(x=x_pos - 30, y=340) 
             pywinstyles.set_opacity(label, value=0.9,color="#000001")
-
-        # Navbar
-        navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")     
-        
-        page_title = ctk.CTkLabel(
-            navbar,
-            text="หน้าพิมพ์รายงาน",
-            font=("TH Sarabun New", 28, "bold"),
-            text_color="black"
-        )   
-        page_title.pack(side="left", padx=20)
-        self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
-            size=(24, 24)
-        )    
-
-        back_button = ctk.CTkButton(
-            navbar,
-           image=self.reply_ctk_image,   # ใช้ image แทน text
-            text="ย้อนกลับ",                      # ไม่ใส่ข้อความ
-            width=100, 
-            height=50, 
-            corner_radius=25,
-            fg_color="#2563EB", 
-            hover_color="#1D3557", 
-            text_color="white",
-            font=("Arial", 24, "bold"), 
-            command=lambda: controller.show_frame(HomePage)
-        )
-        back_button.pack(side="right", padx=10, pady=10)
         
 class Report1(ctk.CTkFrame):
     def __init__(self, parent, controller):
