@@ -1,5 +1,6 @@
 # from server.Database import Database
 from google import genai
+from lib.loadenv import API_AI_KEY
 # from mysql.connector import Error
 import re
 import requests
@@ -8,7 +9,7 @@ class Gemini:
     def __init__(self):
         #  self.Database = Database()
          #กำหนด apikey
-         self.client = genai.Client(api_key="AIzaSyBg-_YMe9T9tyau32USnJ92ziwAX15wj_c")
+         self.client = genai.Client(api_key=API_AI_KEY)
     #ฟังชั่นคำเเนะนำ
     def save_advice(self,id,Systolic,Diastolic,Pulse):
         

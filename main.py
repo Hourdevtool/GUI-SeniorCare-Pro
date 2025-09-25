@@ -10,18 +10,17 @@ from tkcalendar import Calendar
 from datetime import datetime, timedelta
 from pywifi import PyWiFi
 from babel.dates import format_date
-import threading
 # model format เวลา
 from lib.set_time import default_serializer
 from lib.sendTimeToPico import recivetime,start_serial_loop
 
 # --ใหม่--
-# from lib.sendTimeToPico import recivetime,start_serial_loop
 #import pywinstyles
 
 
 # nodel การเเจ้งเตือน
 from lib.alert import sendtoTelegram
+from lib.loadenv import PATH
 
 # model อ่านออกเสียง
 from gtts import gTTS 
@@ -72,13 +71,12 @@ LABEL_FONT_FAMILY = "Arial"
 class login(ctk.CTkFrame):     
     def on_show(self):         
         print("login is now visible")      
-        
     def __init__(self, parent, controller):         
         super().__init__(parent)         
         self.controller = controller          
         
         # พื้นหลังแบบรูปภาพ (1024x600)         
-        bg_image = Image.open("/home/ctnphrae/Desktop/gui/image/login.png").resize((1024, 800), Image.Resampling.LANCZOS)         
+        bg_image = Image.open(f"{PATH}image/login.png").resize((1024, 800), Image.Resampling.LANCZOS)         
         self.bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))         
         bg_label = ctk.CTkLabel(self, image=self.bg_ctk_image, text="")         
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)          
@@ -110,7 +108,7 @@ class login(ctk.CTkFrame):
         
         # === ไอคอนโลโก้ (Logo Icon) ===
         try:
-            logo_login_img = Image.open("/home/ctnphrae/Desktop/gui/image/login-icon.png").resize((40, 40), Image.Resampling.LANCZOS)
+            logo_login_img = Image.open(f"{PATH}image/login-icon.png").resize((40, 40), Image.Resampling.LANCZOS)
             self.logo_ctk_image = ctk.CTkImage(light_image=logo_login_img, size=(40, 40))
             logo_label = ctk.CTkLabel(logo_frame, image=self.logo_ctk_image, text="")
         except:
@@ -149,7 +147,7 @@ class login(ctk.CTkFrame):
         email_frame.grid_columnconfigure(1, weight=1)
 
         # ไอคอนอีเมล
-        email_icon = Image.open("/home/ctnphrae/Desktop/gui/image/email.png").resize((24, 24), Image.Resampling.LANCZOS)
+        email_icon = Image.open(f"{PATH}image/email.png").resize((24, 24), Image.Resampling.LANCZOS)
         self.email_ctk_image = ctk.CTkImage(light_image=email_icon, size=(24, 24))
         ctk.CTkLabel(email_frame, image=self.email_ctk_image, text="").grid(
             row=0, column=0, padx=(15, 10), pady=12, sticky="w"
@@ -173,7 +171,7 @@ class login(ctk.CTkFrame):
         password_frame.grid_columnconfigure(1, weight=1)
 
         # ไอคอนรหัสผ่าน
-        padlock_icon = Image.open("/home/ctnphrae/Desktop/gui/image/padlock.png").resize((24, 24), Image.Resampling.LANCZOS)
+        padlock_icon = Image.open(f"{PATH}image/padlock.png").resize((24, 24), Image.Resampling.LANCZOS)
         self.padlock_ctk_image = ctk.CTkImage(light_image=padlock_icon, size=(24, 24))
         ctk.CTkLabel(password_frame, image=self.padlock_ctk_image, text="").grid(
             row=0, column=0, padx=(15, 10), pady=12, sticky="w"
@@ -193,8 +191,8 @@ class login(ctk.CTkFrame):
         self.password_entry.grid(row=0, column=1, padx=(0, 10), pady=12, sticky="ew")
 
         # ปุ่มแสดง/ซ่อนรหัสผ่าน
-        eye_closed_icon = Image.open("/home/ctnphrae/Desktop/gui/image/eye_closed.png").resize((24, 24), Image.Resampling.LANCZOS)
-        eye_open_icon = Image.open("/home/ctnphrae/Desktop/gui/image/eye_open.png").resize((24, 24), Image.Resampling.LANCZOS)
+        eye_closed_icon = Image.open(f"{PATH}image/eye_closed.png").resize((24, 24), Image.Resampling.LANCZOS)
+        eye_open_icon = Image.open(f"{PATH}image/eye_open.png").resize((24, 24), Image.Resampling.LANCZOS)
         self.eye_closed_ctk = ctk.CTkImage(light_image=eye_closed_icon, size=(24, 24))
         self.eye_open_ctk = ctk.CTkImage(light_image=eye_open_icon, size=(24, 24))
 
@@ -267,7 +265,7 @@ class HomePage(ctk.CTkFrame):
         super().__init__(parent)
         self.controller = controller
         # พื้นหลัง (ปรับขนาดเป็น 1024x600)
-        bg_image = Image.open("/home/ctnphrae/Desktop/gui/image/home.png").resize((1024, 800), Image.Resampling.LANCZOS)
+        bg_image = Image.open(f"{PATH}image/home.png").resize((1024, 800), Image.Resampling.LANCZOS)
         self.bg_photo = ImageTk.PhotoImage(bg_image)
         bg_label = ctk.CTkLabel(self, image=self.bg_photo, text="")
         bg_label.place(x=0, y=-20, relwidth=1, relheight=1)
@@ -296,13 +294,13 @@ class HomePage(ctk.CTkFrame):
 
     def add_status_icons(self):
         # ปรับขนาดไอคอนให้เล็กลง
-        battery_image = Image.open("/home/ctnphrae/Desktop/gui/imgNew/battery.png").resize((30, 30), Image.Resampling.LANCZOS)
+        battery_image = Image.open(f"{PATH}imgNew/battery.png").resize((30, 30), Image.Resampling.LANCZOS)
         self.battery_photo = ImageTk.PhotoImage(battery_image)
         battery_label = ctk.CTkLabel(self, image=self.battery_photo, text="", bg_color="#000001")
         #pywinstyles.set_opacity(battery_label, value=1,color="#000001")
         battery_label.place(x=980, y=10)
 
-        wifi_image = Image.open("/home/ctnphrae/Desktop/gui/imgNew/wi-fi.png").resize((30, 30), Image.Resampling.LANCZOS)
+        wifi_image = Image.open(f"{PATH}imgNew/wi-fi.png").resize((30, 30), Image.Resampling.LANCZOS)
         self.wifi_photo = ImageTk.PhotoImage(wifi_image)
         wifi_label = ctk.CTkLabel(self, image=self.wifi_photo, text="", bg_color="#000001")
         #s.set_opacity(wifi_label, value=1,color="#000001")
@@ -318,9 +316,9 @@ class HomePage(ctk.CTkFrame):
 
         if pressure == 1:
             paths = [
-                "/home/ctnphrae/Desktop/gui/imgNew/iconuser.png", "/home/ctnphrae/Desktop/gui/imgNew/icontime.png", "/home/ctnphrae/Desktop/gui/imgNew/iconheath.png",
-                "/home/ctnphrae/Desktop/gui/imgNew/icondog.png", "/home/ctnphrae/Desktop/gui/imgNew/iconreport.png", "/home/ctnphrae/Desktop/gui/imgNew/iconout.png",
-                "/home/ctnphrae/Desktop/gui/imgNew/icondow.png"
+                f"{PATH}imgNew/iconuser.png", f"{PATH}imgNew/icontime.png", f"{PATH}imgNew/iconheath.png",
+                f"{PATH}imgNew/icondog.png", f"{PATH}imgNew/iconreport.png", f"{PATH}imgNew/iconout.png",
+                f"{PATH}imgNew/icondow.png"
             ]
             btn_texts = [
                 "ข้อมูลผู้ใช้", "ตั้งเวลา", "สุขภาพ",
@@ -328,9 +326,9 @@ class HomePage(ctk.CTkFrame):
             ]
         else:
             paths = [
-                "/home/ctnphrae/Desktop/gui/imgNew/iconuser.png", "/home/ctnphrae/Desktop/gui/imgNew/icontime.png",
-                "/home/ctnphrae/Desktop/gui/imgNew/icondog.png", "/home/ctnphrae/Desktop/gui/imgNew/iconreport.png", "/home/ctnphrae/Desktop/gui/imgNew/iconout.png",
-                "/home/ctnphrae/Desktop/gui/imgNew/icondow.png"
+                f"{PATH}imgNew/iconuser.png", f"{PATH}imgNew/icontime.png",
+                f"{PATH}imgNew/icondog.png", f"{PATH}imgNew/iconreport.png", f"{PATH}imgNew/iconout.png",
+                f"{PATH}imgNew/icondow.png"
             ]
             btn_texts = [
                 "ข้อมูลผู้ใช้", "ตั้งเวลา",
@@ -1027,7 +1025,7 @@ class Frame2(ctk.CTkFrame):
         self.configure(bg_color="#8dc5fc")
 
         # Background
-        bg_image = Image.open("/home/ctnphrae/Desktop/gui/image/drugs.png").resize((1024, 800), Image.Resampling.LANCZOS)
+        bg_image = Image.open(f"{PATH}image/drugs.png").resize((1024, 800), Image.Resampling.LANCZOS)
         self.bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))
         bg_label = ctk.CTkLabel(self, image=self.bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
@@ -1045,7 +1043,7 @@ class Frame2(ctk.CTkFrame):
         )  
         page_title.pack(side="left", padx=20)
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("/home/ctnphrae/Desktop/gui/image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )
 
@@ -1213,7 +1211,7 @@ class Frame3(ctk.CTkFrame):
         options = ["1 มื้อ", "2 มื้อ", "3 มื้อ", "4 มื้อ"]
         
         # พื้นหลัง
-        bg_image = Image.open("image/time.png").resize((1024, 800), Image.Resampling.LANCZOS)
+        bg_image = Image.open(f"{PATH}image/time.png").resize((1024, 800), Image.Resampling.LANCZOS)
         self.bg_photo = ImageTk.PhotoImage(bg_image)
         bg_label = ctk.CTkLabel(self, image=self.bg_photo, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
@@ -1303,7 +1301,7 @@ class Frame3(ctk.CTkFrame):
         )  
         page_title.pack(side="left", padx=20)
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )
         # ปุ่มย้อนกลับแบบ Rounded
@@ -1356,7 +1354,7 @@ class Frame4(ctk.CTkFrame):
         super().__init__(parent, width=1024, height=600)
         self.controller = controller
      
-        bg_image = Image.open("image/pageheath.png").resize((1024, 800), Image.Resampling.LANCZOS) 
+        bg_image = Image.open(f"{PATH}image/pageheath.png").resize((1024, 800), Image.Resampling.LANCZOS) 
         self.bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))
         bg_label = ctk.CTkLabel(self, image=self.bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
@@ -1378,7 +1376,7 @@ class Frame4(ctk.CTkFrame):
         page_title.pack(side="left", padx=20)
 
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )
 
@@ -1460,8 +1458,8 @@ class add_Frame(ctk.CTkFrame):
         self.configure(fg_color="#FFFFFF")
 
         # === Background ===
-        bg_image = Image.open("image/drugs.png").resize((1024, 600), Image.Resampling.LANCZOS)
-        bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 600))
+        bg_image = Image.open(f"{PATH}image/drugs.png").resize((1024, 800), Image.Resampling.LANCZOS)
+        bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))
         bg_label = ctk.CTkLabel(self, image=bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 
@@ -1477,7 +1475,7 @@ class add_Frame(ctk.CTkFrame):
         )  
         page_title.pack(side="left", padx=20)
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )
         
@@ -1721,11 +1719,11 @@ class AIgen(ctk.CTkFrame):
         self.controller.show_frame(HomePage)
 
     def __init__(self, parent, controller):
-        super().__init__(parent, width=1024, height=600)
+        super().__init__(parent, width=1024, height=800)
         self.controller = controller
         
-        bg_image = Image.open("image/report.png").resize((1024, 600), Image.Resampling.LANCZOS)
-        self.bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 600))
+        bg_image = Image.open(f"{PATH}image/report.png").resize((1024, 800), Image.Resampling.LANCZOS)
+        self.bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))
         bg_label = ctk.CTkLabel(self, image=self.bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 
@@ -1866,8 +1864,8 @@ class MedicationApp(ctk.CTkFrame):
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
-        bg_image = Image.open("image/time.png").resize((1024, 600), Image.Resampling.LANCZOS)
-        self.bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 600))
+        bg_image = Image.open(f"{PATH}image/time.png").resize((1024, 800), Image.Resampling.LANCZOS)
+        self.bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))
         bg_label = ctk.CTkLabel(self, image=self.bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 
@@ -1884,7 +1882,7 @@ class MedicationApp(ctk.CTkFrame):
         
         self.page_title.pack(side="left", padx=20)
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )
         
@@ -2225,7 +2223,7 @@ class info(ctk.CTkFrame):
         self.result = None
 
         # Background
-        bg_image = Image.open("image/info.png").resize((1024, 800), Image.Resampling.LANCZOS)
+        bg_image = Image.open(f"{PATH}image/info.png").resize((1024, 800), Image.Resampling.LANCZOS)
         bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))
         bg_label = ctk.CTkLabel(self, image=bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
@@ -2246,7 +2244,7 @@ class info(ctk.CTkFrame):
             controller.show_frame(HomePage)
 
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )
         
@@ -2372,7 +2370,7 @@ class MedicationScheduleFrame(ctk.CTkFrame):
         self.pack_propagate(False)  # ✅ กันไม่ให้ย่อ/ขยายเอง
 
         # === พื้นหลัง ===
-        bg_image = Image.open("image/time.png").resize((1024, 800), Image.Resampling.LANCZOS) 
+        bg_image = Image.open(f"{PATH}image/time.png").resize((1024, 800), Image.Resampling.LANCZOS) 
         bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))
         bg_label = ctk.CTkLabel(self, image=bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
@@ -2502,7 +2500,7 @@ class MedicationScheduleFrame(ctk.CTkFrame):
 
         page_title.pack(side="left", padx=20)
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )
         
@@ -2668,7 +2666,7 @@ class ReportFrame(ctk.CTkFrame):
         self.controller = controller          
         
         # พื้นหลัง - ปรับขนาดเป็น 1024x600
-        bg_image = Image.open("image/reportdata.png").resize((1024, 800), Image.Resampling.LANCZOS)         
+        bg_image = Image.open(f"{PATH}image/reportdata.png").resize((1024, 800), Image.Resampling.LANCZOS)         
         bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))         
         bg_label = ctk.CTkLabel(self, image=bg_ctk_image, text="")         
         bg_label.place(x=0, y=0, relwidth=1, relheight=1) 
@@ -2688,7 +2686,7 @@ class ReportFrame(ctk.CTkFrame):
         )   
         page_title.pack(side="left", padx=20)
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )    
 
@@ -2712,11 +2710,11 @@ class ReportFrame(ctk.CTkFrame):
         if(self.controller.user['pressure'] == 1):
             pages = [Report1, Report2]         
             labels = ["รายงานข้อมูลการจ่ายยา", "รายงานข้อมูลความดันและชีพจร"]  
-            imgpath = ["imgNew/iconreport2.png", "imgNew/pageuser.png", "imgNew/iconreport1.png"]
+            imgpath = [f"{PATH}imgNew/iconreport2.png", f"{PATH}imgNew/pageuser.png", f"{PATH}imgNew/iconreport1.png"]
         else:
             pages = [Report1]         
             labels = ["รายงานข้อมูลการจ่ายยา"]  
-            imgpath = ["imgNew/iconreport2.png"]
+            imgpath = [f"{PATH}imgNew/iconreport2.png"]
         for i, path in enumerate(imgpath, start=1):             
             try:                 
                 img = Image.open(path).resize(btn_size, Image.Resampling.LANCZOS)                 
@@ -2773,7 +2771,7 @@ class Report1(ctk.CTkFrame):
         self.data = []
 
         # พื้นหลังธีมเครื่องจ่ายยา - ปรับขนาดเป็น 1024x600
-        bg_image = Image.open("image/reportdata.png").resize((1024, 800), Image.Resampling.LANCZOS)
+        bg_image = Image.open(f"{PATH}image/reportdata.png").resize((1024, 800), Image.Resampling.LANCZOS)
         bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))
         bg_label = ctk.CTkLabel(self, image=bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
@@ -2789,7 +2787,7 @@ class Report1(ctk.CTkFrame):
 
 
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )
 
@@ -3006,7 +3004,7 @@ class Report2(ctk.CTkFrame):
         self.controller = controller
 
         # ✅ Background - ปรับขนาดเป็น 1024x600
-        bg_image = Image.open("image/reportdata.png").resize((1024, 800), Image.Resampling.LANCZOS)
+        bg_image = Image.open(f"{PATH}image/reportdata.png").resize((1024, 800), Image.Resampling.LANCZOS)
         bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))
         bg_label = ctk.CTkLabel(self, image=bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
@@ -3024,7 +3022,7 @@ class Report2(ctk.CTkFrame):
         page_title.pack(side="left", padx=20)
 
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )
 
@@ -3295,43 +3293,43 @@ class Wificonnect(ctk.CTkFrame):
 
         # === โหลดภาพและสร้าง CTkImage ===
         self.bg_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/wifi.png").resize((1024, 800)), 
+            light_image=Image.open(f"{PATH}image/wifi.png").resize((1024, 800)), 
             size=(1024, 600)
         )
         self.internet_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/internet.png").resize((32, 32)), 
+            light_image=Image.open(f"{PATH}image/internet.png").resize((32, 32)), 
             size=(32, 32)
         )
         self.refresh_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/refresh.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/refresh.png").resize((24, 24)), 
             size=(24, 24)
         )
         self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/reply.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
             size=(24, 24)
         )
         self.send_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/send.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/send.png").resize((24, 24)), 
             size=(24, 24)
         )
         self.padlock_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/padlock.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/padlock.png").resize((24, 24)), 
             size=(24, 24)
         )
         self.broken_link_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/broken-link.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/broken-link.png").resize((24, 24)), 
             size=(24, 24)
         )
         self.eye_open_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/eye_open.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/eye_open.png").resize((24, 24)), 
             size=(24, 24)
         )
         self.eye_closed_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/eye_closed.png").resize((24, 24)), 
+            light_image=Image.open(f"{PATH}image/eye_closed.png").resize((24, 24)), 
             size=(24, 24)
         )
         self.no_signal_ctk_image = ctk.CTkImage(
-            light_image=Image.open("image/no-signal.png").resize((48, 48)), 
+            light_image=Image.open(f"{PATH}image/no-signal.png").resize((48, 48)), 
             size=(48, 48)
         )
 
