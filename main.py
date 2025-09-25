@@ -446,7 +446,7 @@ class HomePage(ctk.CTkFrame):
             text_color="#000000",
             fg_color="transparent"
         )
-        self.medication_title.place(x=50, y=10)
+        self.medication_title.place(x=30, y=10)
 
         # ปุ่มควบคุม
         self.refresh_button = ctk.CTkButton(
@@ -459,13 +459,13 @@ class HomePage(ctk.CTkFrame):
             corner_radius=8,
             width=40,
             height=25,
-            command=self.reset_and_update_threaded
+            command=self.reset_and_update
         )
         self.refresh_button.place(x=250, y=8)
 
         self.setting_button = ctk.CTkButton(
             header_frame,
-            text="ตั้งค่า",
+            text="รีเฟรช",
             font=("TH Sarabun New", 20, "bold"),
             fg_color="#007BFF",
             hover_color="#0056B3",
@@ -473,9 +473,9 @@ class HomePage(ctk.CTkFrame):
             corner_radius=8,
             width=40,
             height=25,
-            command=lambda: self.controller.show_frame(Frame2)
+            command=lambda: self.update_medication_info()
         )
-        self.setting_button.place(x=180, y=8)
+        self.setting_button.place(x=160, y=8)
 
         # สร้างกรอบสำหรับแสดงรายการยา
         self.medication_list_frame = ctk.CTkScrollableFrame(
@@ -630,15 +630,17 @@ class HomePage(ctk.CTkFrame):
         
         print(f"สร้างส่วนแสดงจำนวนยาคงเหลือเสร็จสิ้น: {self.medicine_count} เม็ด")
     
-    def reset_and_update_threaded(self):
-        def task():
-            try:
-                set_dispensing_time.delete_time(self.controller.user['id'])
-                self.update_medication_info()
-            except Exception as e:
-                print("เกิดข้อผิดพลาด:", e)
-
-        threading.Thread(target=task, daemon=True).start()
+    def reset_and_update(self):
+        response = messagebox.askyesno(
+            "ยืนยันการรีเซ็ต", 
+            "คุณต้องการลบข้อมูลการตั้งเวลาจ่ายยา หรือ ไม่?"
+        )
+        if response:
+                try:
+                    set_dispensing_time.delete_time(self.controller.user['id'])
+                    self.update_medication_info()
+                except Exception as e:
+                    print("เกิดข้อผิดพลาด:", e)
     # ฟังก์ชันสำหรับอัพเดทจำนวนยา
     def update_medicine_count(self, new_count=None):
         """อัพเดทจำนวนยาคงเหลือ"""
@@ -1861,6 +1863,7 @@ class MedicationApp(ctk.CTkFrame):
         super().__init__(parent)
         self.controller = controller
 
+        self.selected_time_periods = {} 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
@@ -1950,8 +1953,9 @@ class MedicationApp(ctk.CTkFrame):
                 print(medicine_data['message'])
                 return 
 
-        # for widget in self.frame_container.winfo_children():
-        #     widget.destroy()
+        self.selected_time_periods = {}
+        for i in range(len(self.pages)):
+            self.selected_time_periods[i] = {}
 
         self.pages = []
         self.current_page = 0
@@ -1983,7 +1987,7 @@ class MedicationApp(ctk.CTkFrame):
             widget.pack_forget()
 
         self.pages[page_index].pack(fill="both", expand=True)
-
+      
         if page_index == 1 and hasattr(self, 'next_button'):
             self.next_button.pack_forget()
         elif page_index == 0 and hasattr(self, 'next_button'):
@@ -2007,7 +2011,7 @@ class MedicationApp(ctk.CTkFrame):
 
         self.pages[page_index].pack(fill="both", expand=True)
 
-        for i in range(page_index * 2, min((page_index + 1) * 2, self.num_meals)):
+        for i in range(page_index * 2, min((page_index + 1) * 2, self.num_meals)):        
             meal_name = self.time_options[i]
 
             meal_label = ctk.CTkLabel(
@@ -2036,6 +2040,9 @@ class MedicationApp(ctk.CTkFrame):
             )
             time_select.grid(row=3, column=i % 2, padx=40, pady=(0, 0), sticky="w")
             time_select.set("เลือกช่วงเวลา")
+
+            time_select.configure(command=lambda value, meal=meal_name, col=i%2:self.on_time_period_select(page_index, col, value, meal))
+
             self.time_selects[meal_name] = time_select
 
             self.entry_frames[meal_name] = ctk.CTkFrame(self.pages[page_index], fg_color=back_color)
@@ -2047,6 +2054,7 @@ class MedicationApp(ctk.CTkFrame):
                 command=lambda m=meal_name: self.add_medication_entry(m)
             )
             add_button.pack(pady=8)
+        self.update_time_periods_availability(page_index)
 
     def open_numpad(self, entry):
         TimeNumpad(self, entry)
@@ -2098,6 +2106,55 @@ class MedicationApp(ctk.CTkFrame):
         delete_button.grid(row=0, column=1, sticky="w")
 
         self.med_entries[meal].append((row, med_combo, delete_button))
+    def on_time_period_select(self, page_index, column_index, selected_value, meal_name):
+        """เมื่อผู้ใช้เลือกช่วงเวลา"""
+        # บันทึกค่าที่เลือก
+        self.selected_time_periods[page_index][column_index] = selected_value
+        
+        # อัปเดตสถานะ dropdown ทั้งหมด
+        self.update_time_periods_availability(page_index)
+        
+        # อัปเดต dropdown ในหน้าอื่นด้วย (ถ้ามี)
+        for page_idx in self.selected_time_periods:
+            if page_idx != page_index:
+                self.update_time_periods_availability(page_idx)
+    
+    def update_time_periods_availability(self, page_index):
+        """อัปเดตสถานะของ dropdown ช่วงเวลาในหน้าเฉพาะ"""
+        # รวบรวมช่วงเวลาที่ถูกเลือกแล้วในทุกหน้า
+        all_selected_periods = []
+        for page_idx, selections in self.selected_time_periods.items():
+            all_selected_periods.extend(selections.values())
+        
+        # สำหรับแต่ละ dropdown ในหน้านี้
+        for i in range(page_index * 2, min((page_index + 1) * 2, self.num_meals)):
+            meal_name = self.time_options[i]
+            time_select = self.time_selects[meal_name]
+            current_value = time_select.get()
+            column_index = i % 2
+            
+            # สร้างรายการตัวเลือกใหม่ (ปิดการใช้งานตัวเลือกที่ถูกเลือกไปแล้ว)
+            new_values = []
+            for period in self.time_options:
+                # ถ้าช่วงเวลานี้ถูกเลือกในที่อื่น และไม่ใช่ค่าปัจจุบันของ dropdown นี้
+                if period in all_selected_periods and period != current_value:
+                    new_values.append(f"║ {period} ║")  # แสดงว่าไม่สามารถเลือกได้
+                else:
+                    new_values.append(period)
+            
+            # อัปเดตค่าที่แสดงใน dropdown
+            time_select.configure(values=new_values)
+            
+            # ตั้งค่าปัจจุบันใหม่ (เพื่อให้แสดงถูกต้อง)
+            if current_value in new_values:
+                time_select.set(current_value)
+            else:
+                # ถ้าค่าปัจจุบันไม่สามารถเลือกได้ (ถูกเลือกในที่อื่น) ให้รีเซ็ต
+                if current_value != "เลือกช่วงเวลา" and current_value not in [f"║ {p} ║" for p in self.time_options]:
+                    time_select.set("เลือกช่วงเวลา")
+                    # ลบออกจาก selected_time_periods
+                    if page_index in self.selected_time_periods and column_index in self.selected_time_periods[page_index]:
+                        del self.selected_time_periods[page_index][column_index]
 
     def remove_medication_entry(self, meal, row, med_combo):
         for entry in self.med_entries[meal]:
@@ -2166,7 +2223,16 @@ class MedicationApp(ctk.CTkFrame):
             }
    
         print("บันทึกข้อมูลสำเร็จ! ข้อมูลที่บันทึก:", meal_data)
-
+        all_selected_periods = []
+        for page_idx, selections in self.selected_time_periods.items():
+            all_selected_periods.extend(selections.values())
+        
+        # ตรวจสอบว่ามีค่าซ้ำกันหรือไม่ (ไม่นับค่าว่าง)
+        selected_periods = [p for p in all_selected_periods if p and p != "เลือกช่วงเวลา"]
+        if len(selected_periods) != len(set(selected_periods)):
+            # มีการเลือกซ้ำกัน
+            messagebox.showerror("ข้อผิดพลาด", "มีการเลือกช่วงเวลาซ้ำกัน กรุณาตรวจสอบอีกครั้ง")
+            return
         insert_meal = set_dispensing_time.set_meal(self.controller.user['device_id'],self.controller.user['id'],meal_data)
         if( insert_meal['status']):
             print(insert_meal['message'])
