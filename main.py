@@ -86,7 +86,7 @@ class login(ctk.CTkFrame):
             self,             
             width=410,             
             height=530,             
-            corner_radius=25,             
+            corner_radius=0,             
             fg_color="white",             
             bg_color="#000001"         
         )         
@@ -268,18 +268,18 @@ class HomePage(ctk.CTkFrame):
         bg_image = Image.open(f"{PATH}image/home.png").resize((1024, 800), Image.Resampling.LANCZOS)
         self.bg_photo = ImageTk.PhotoImage(bg_image)
         bg_label = ctk.CTkLabel(self, image=self.bg_photo, text="")
-        bg_label.place(x=0, y=-20, relwidth=1, relheight=1)
+        bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 
         # ไอคอน battery และ wifi
         self.add_status_icons()
         # วันที่และเวลา
-        self.date_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 35, "bold"),
-                                       fg_color="#000001", text_color="white")
-        self.date_label.place(x=390, y=10)
+        self.date_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 42, "bold"),
+                                       fg_color="#8acaef", text_color="white")
+        self.date_label.place(x=70, y=182)
 
-        self.time_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 35, "bold"),
-                                       fg_color="#000001", text_color="white")
-        self.time_label.place(x=740, y=10)
+        self.time_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 42, "bold"),
+                                       fg_color="#8acaef", text_color="white")
+        self.time_label.place(x=360, y=182)
 
         # สร้างส่วนแสดงข้อมูลการตั้งค่ายา
         self.create_medication_display()
@@ -296,15 +296,15 @@ class HomePage(ctk.CTkFrame):
         # ปรับขนาดไอคอนให้เล็กลง
         battery_image = Image.open(f"{PATH}imgNew/battery.png").resize((30, 30), Image.Resampling.LANCZOS)
         self.battery_photo = ImageTk.PhotoImage(battery_image)
-        battery_label = ctk.CTkLabel(self, image=self.battery_photo, text="", bg_color="#000001")
+        battery_label = ctk.CTkLabel(self, image=self.battery_photo, text="", bg_color="#8acaef")
         #pywinstyles.set_opacity(battery_label, value=1,color="#000001")
-        battery_label.place(x=980, y=10)
+        battery_label.place(x=925, y=55)
 
         wifi_image = Image.open(f"{PATH}imgNew/wi-fi.png").resize((30, 30), Image.Resampling.LANCZOS)
         self.wifi_photo = ImageTk.PhotoImage(wifi_image)
-        wifi_label = ctk.CTkLabel(self, image=self.wifi_photo, text="", bg_color="#000001")
+        wifi_label = ctk.CTkLabel(self, image=self.wifi_photo, text="", bg_color="#8acaef")
         #s.set_opacity(wifi_label, value=1,color="#000001")
-        wifi_label.place(x=930, y=10)
+        wifi_label.place(x=845, y=55)
 
     def create_menu_buttons(self, controller):
         # ปรับขนาดปุ่มให้เล็กลง
@@ -348,7 +348,7 @@ class HomePage(ctk.CTkFrame):
         btn_width = 100
         btn_height = 80
         start_x = 30
-        start_y = 500
+        start_y = 600
 
         for i in range(7):
             if i + 1 in btn_images:
@@ -385,7 +385,7 @@ class HomePage(ctk.CTkFrame):
                     border_color="#A8DADC",
                     width=100,
                     height=90,
-                    corner_radius=15,
+                    corner_radius=0,
                     command=command
                 )
                 btn.place(x=x_pos, y=y_pos)
@@ -412,13 +412,13 @@ class HomePage(ctk.CTkFrame):
             self,
             width=340,
             height=300,
-            corner_radius=20,
+            corner_radius=0,
             fg_color="#FFFFFF",
             bg_color="#000001",
             border_width=2,
             border_color="#E8F4FD"
         )
-        self.medication_frame.place(x=340, y=150)
+        self.medication_frame.place(x=340, y=280)
         #pywinstyles.set_opacity(self.medication_frame, value=1, color="#000001")
 
         # หัวข้อพร้อมไอคอน
@@ -426,7 +426,7 @@ class HomePage(ctk.CTkFrame):
             self.medication_frame,
             width=320,
             height=40,
-            corner_radius=10,
+            corner_radius=20,
             fg_color="#E8F4FD"
         )
         header_frame.place(x=10, y=10)
@@ -497,13 +497,13 @@ class HomePage(ctk.CTkFrame):
             self,
             width=300,
             height=300,
-            corner_radius=20,
+            corner_radius=0,
             fg_color="#FFFFFF",
             bg_color="#000001",
             border_width=2,
             border_color="#FFF2E8"
         )
-        self.user_info_frame.place(x=700, y=150)
+        self.user_info_frame.place(x=700, y=280)
         #pywinstyles.set_opacity(self.user_info_frame, value=1, color="#000001")
 
         # หัวข้อพร้อมไอคอน
@@ -533,21 +533,6 @@ class HomePage(ctk.CTkFrame):
         )
         self.user_info_title.place(x=50, y=10)
 
-        # ปุ่มอัพเดท
-        self.refresh_user_button = ctk.CTkButton(
-            header_frame,
-            text="รีเซ็ต",
-            font=("TH Sarabun New", 20, "bold"),
-            fg_color="#f4b81a",
-            hover_color="#2D6A4F",
-            text_color="white",
-            corner_radius=8,
-            width=40,
-            height=25,
-            command=self.update_user_info
-        )
-        self.refresh_user_button.place(x=200, y=8)
-
         # สร้างกรอบสำหรับแสดงข้อมูล
         self.user_info_content = ctk.CTkScrollableFrame(
             self.user_info_frame,
@@ -567,13 +552,13 @@ class HomePage(ctk.CTkFrame):
             self,
             width=300,
             height=300,
-            corner_radius=20,
+            corner_radius=0,
             fg_color="#FFFFFF",
             bg_color="#000001",
             border_width=2,
             border_color="#FFF2E8"
         )
-        self.medicine_frame.place(x=20, y=150)
+        self.medicine_frame.place(x=20, y=280)
         #pywinstyles.set_opacity(self.medicine_frame, value=1, color="#000001")
     
         # หัวข้อพร้อมไอคอน
@@ -1084,8 +1069,7 @@ class Frame2(ctk.CTkFrame):
             width=700,
             height=400,
             fg_color="#FFFFFF",
-            bg_color="#000001",
-            corner_radius=20,
+            corner_radius=0,
         )
         self.outer_frame.place(relx=0.5, rely=0.5, anchor="center")
         #pywinstyles.set_opacity(self.outer_frame, value=0.9,color="#000001")
@@ -1220,7 +1204,7 @@ class Frame3(ctk.CTkFrame):
         
         content_frame = ctk.CTkFrame(
             self, width=700, height=400,
-            corner_radius=25, fg_color="#FFFFFF", bg_color="#000001",
+            corner_radius=0, fg_color="#FFFFFF", bg_color="#000001",
             border_width=2, border_color="#E8E8E8"
         )
         content_frame.place(relx=0.5, rely=0.5, anchor="center")
@@ -1353,7 +1337,7 @@ class Frame4(ctk.CTkFrame):
         print("Frame4 is now visible")
 
     def __init__(self, parent, controller):
-        super().__init__(parent, width=1024, height=600)
+        super().__init__(parent, width=1024, height=800)
         self.controller = controller
      
         bg_image = Image.open(f"{PATH}image/pageheath.png").resize((1024, 800), Image.Resampling.LANCZOS) 
@@ -1361,9 +1345,18 @@ class Frame4(ctk.CTkFrame):
         bg_label = ctk.CTkLabel(self, image=self.bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-        frame = ctk.CTkFrame(self, width=800, height=400, corner_radius=25, fg_color="#FFFFFF", bg_color="#000001") 
+        # กรอบหลัก
+        frame = ctk.CTkFrame(self, width=800, height=400, corner_radius=0, fg_color="#FFFFFF", bg_color="#000001") 
         frame.place(relx=0.5, rely=0.5, anchor="center")
-        #pywinstyles.set_opacity(frame, value=0.9,color="#000001")
+
+        # === หัวข้อกล่อง ===
+        title_label = ctk.CTkLabel(
+            frame,
+            text="วัดความดันและชีพจร",
+            font=("TH Sarabun New", 28, "bold"),
+            text_color="black"
+        )
+        title_label.grid(row=0, column=0, columnspan=2, pady=(15, 10))
 
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
@@ -1384,8 +1377,8 @@ class Frame4(ctk.CTkFrame):
 
         back_button = ctk.CTkButton(
             navbar,
-           image=self.reply_ctk_image,   # ใช้ image แทน text
-            text="ย้อนกลับ",                      # ไม่ใส่ข้อความ
+            image=self.reply_ctk_image,
+            text="ย้อนกลับ",
             width=100, 
             height=50, 
             corner_radius=25,
@@ -1397,6 +1390,7 @@ class Frame4(ctk.CTkFrame):
         )
         back_button.pack(side="right", padx=10, pady=10)
 
+        # ====== Input ======
         self.systolic_var = ctk.StringVar()
         self.diastolic_var = ctk.StringVar()
         self.pulse_var = ctk.StringVar()
@@ -1408,10 +1402,11 @@ class Frame4(ctk.CTkFrame):
             label.grid(row=row, column=0, padx=20, pady=(10, 0), sticky="w")
             entry.grid(row=row+1, column=0, columnspan=2, padx=20, pady=(0, 10), sticky="ew")
 
-        create_input("ความดันสูงสุด (Systolic)", self.systolic_var, 0)
-        create_input("ความดันต่ำสุด (Diastolic)", self.diastolic_var, 2)
-        create_input("ชีพจร (Pulse)", self.pulse_var, 4)
+        create_input("ความดันสูงสุด (Systolic)", self.systolic_var, 1)
+        create_input("ความดันต่ำสุด (Diastolic)", self.diastolic_var, 3)
+        create_input("ชีพจร (Pulse)", self.pulse_var, 5)
 
+        # ====== ปุ่ม ======
         def clear_data():
             self.systolic_var.set("")
             self.diastolic_var.set("")
@@ -1426,15 +1421,14 @@ class Frame4(ctk.CTkFrame):
             💓 ความดันต่ำ: {self.diastolic_var.get()} mmHg\n
             💓 ชีพจร: {self.pulse_var.get()} bpm
             '''
-            # sendtoTelegram(message, self.controller.user['telegram_key'], self.controller.user['telegram_id'])
-            if len(self.systolic_var.get().strip())== 0 and len(self.diastolic_var.get().strip()) == 0 and len(self.pulse_var.get().strip()) == 0:
+            if len(self.systolic_var.get().strip()) == 0 and len(self.diastolic_var.get().strip()) == 0 and len(self.pulse_var.get().strip()) == 0:
                 print('กรุณากรอกข้อมูลให้ครบถ้วน')
                 return
-            ai_advice = ai.save_advice(self.controller.user['id'],self.systolic_var.get(),self.diastolic_var.get(),self.pulse_var.get())
+            ai_advice = ai.save_advice(self.controller.user['id'], self.systolic_var.get(), self.diastolic_var.get(), self.pulse_var.get())
             if ai_advice['status']:
-                 self.controller.advice = ai_advice['Advice']
-                 sendtoTelegram(ai_advice['Advice'], self.controller.user['telegram_key'], self.controller.user['telegram_id'])
-                 controller.show_frame(AIgen)
+                self.controller.advice = ai_advice['Advice']
+                sendtoTelegram(ai_advice['Advice'], self.controller.user['telegram_key'], self.controller.user['telegram_id'])
+                controller.show_frame(AIgen)
             else:
                 print(ai_advice['message'])
             
@@ -1444,8 +1438,8 @@ class Frame4(ctk.CTkFrame):
         clear_button = ctk.CTkButton(frame, text="ล้างข้อมูล", width=200, height=70, fg_color=bottom_hover,
                                      text_color="white", font=("Arial", 24, "bold"), command=clear_data)
 
-        save_button.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
-        clear_button.grid(row=6, column=1, padx=20, pady=10, sticky="ew")
+        save_button.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
+        clear_button.grid(row=7, column=1, padx=20, pady=10, sticky="ew")
 
 
 
@@ -1502,8 +1496,8 @@ class add_Frame(ctk.CTkFrame):
 
         # === Enhanced Parent Frame ===
         parent_frame = ctk.CTkFrame(
-            self, width=650, height=400, corner_radius=25,
-            fg_color="#FFFFFF",bg_color="#000001"
+            self, width=650, height=400, corner_radius=0,
+            fg_color="#FFFFFF"
         )
         parent_frame.place(relx=0.5, rely=0.5, anchor="center")
         #pywinstyles.set_opacity(parent_frame, value=0.95, color="#000001")
@@ -1680,20 +1674,19 @@ class add_Frame(ctk.CTkFrame):
 
 class AIgen(ctk.CTkFrame):
     def on_show(self):
-      
         # modelการพูด
         print("AIgen is now visible")
         self.label.configure(text=self.controller.advice)
 
-        tts = gTTS(text=self.controller.advice,lang='th')
+        tts = gTTS(text=self.controller.advice, lang='th')
         tts.save("thai_voice.mp3")
 
         if not mixer.get_init():
-                mixer.init()
+            mixer.init()
 
         if mixer.music.get_busy():
             mixer.music.stop()
-     
+
         mixer.music.load("thai_voice.mp3")
         mixer.music.play()
 
@@ -1714,8 +1707,8 @@ class AIgen(ctk.CTkFrame):
                 mixer.music.stop()
             mixer.quit()
             if os.path.exists('thai_voice.mp3'):
-                 os.remove("thai_voice.mp3")  
-        except Exception as e :
+                os.remove("thai_voice.mp3")  
+        except Exception as e:
             print(f"เกิดข้อผิดพลาดขณะลบไฟล์: {e}")
         
         self.controller.show_frame(HomePage)
@@ -1731,19 +1724,25 @@ class AIgen(ctk.CTkFrame):
 
         # === Parent Frame ===
         parent_frame = ctk.CTkFrame(
-            self, width=750, height=450, corner_radius=25,
-            fg_color="#FFFFFF", bg_color="#000001"
+            self, width=750, height=450, corner_radius=0,
+            fg_color="#FFFFFF"
         )
         parent_frame.place(relx=0.5, rely=0.5, anchor="center")
         
-        # ตั้งค่าโปร่งแสงให้ parent frame
-        #pywinstyles.set_opacity(parent_frame, value=0.9, color="#000001")
-        
+        # === หัวข้อกล่อง ===
+        title_label = ctk.CTkLabel(
+            parent_frame,
+            text="คำแนะนำจาก AI",
+            font=("TH Sarabun New", 28, "bold"),
+            text_color="black"
+        )
+        title_label.pack(pady=(15, 5))   # เว้นระยะด้านบนเล็กน้อย
+
         # === Scrollable Child ===
         frame = ctk.CTkScrollableFrame(
-            parent_frame, width=700, height=400, corner_radius=20, fg_color="#FFFFFF"
+            parent_frame, width=700, height=360, corner_radius=20, fg_color="#FFFFFF"
         )
-        frame.place(relx=0.5, rely=0.5, anchor="center")
+        frame.pack(pady=(0, 10))  # ขยับลงเล็กน้อยให้สวยงาม
 
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
@@ -1757,7 +1756,7 @@ class AIgen(ctk.CTkFrame):
         )  
         page_title.pack(side="left", padx=20)
 
-        back_button = ctk.CTkButton(navbar, text="ยืนยัน",width=100, height=50,  corner_radius=BUTTON_RADIUS,
+        back_button = ctk.CTkButton(navbar, text="ยืนยัน", width=100, height=50, corner_radius=BUTTON_RADIUS,
                                     fg_color=force_color, hover_color=bottom_hover, text_color="white",
                                     font=("Arial", 26, "bold"),
                                     command=self.stop_and_go_home)
@@ -1777,6 +1776,7 @@ class AIgen(ctk.CTkFrame):
             wraplength=680  
         )
         self.label.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
          
         
 
@@ -1916,7 +1916,7 @@ class MedicationApp(ctk.CTkFrame):
 
         # === Parent Frame ===
         parent_frame = ctk.CTkFrame(
-            self, width=750, height=450, corner_radius=25,
+            self, width=750, height=450, corner_radius=0,
             fg_color="#FFFFFF", bg_color="#000001"
         )
         parent_frame.place(relx=0.5, rely=0.5, anchor="center")
@@ -2335,7 +2335,7 @@ class info(ctk.CTkFrame):
             return "break"
 
         # Form Frame
-        form_frame = ctk.CTkFrame(self, corner_radius=20, fg_color="#FFFFFF", bg_color="#000001" ,
+        form_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#FFFFFF", bg_color="#000001" ,
                                    width=750, height=440)
         form_frame.place(relx=0.5, rely=0.5, anchor="center")
         #pywinstyles.set_opacity(form_frame, value=0.8,color="#000001")
@@ -2444,7 +2444,7 @@ class MedicationScheduleFrame(ctk.CTkFrame):
         # === กรอบหลัก ===
         content_frame = ctk.CTkFrame(
             self, width=800, height=400,
-            corner_radius=25, fg_color="#ffffff", bg_color="#000001",
+            corner_radius=0, fg_color="#ffffff", bg_color="#000001",
             border_width=3, border_color="#E8E8E8"
         )
         content_frame.place(relx=0.5, rely=0.47, anchor="center")
@@ -2805,12 +2805,12 @@ class ReportFrame(ctk.CTkFrame):
                     bg_color="#000001",                     
                     border_width=2,                     
                     border_color="#1d567b",                     
-                    corner_radius=15,                     
+                    corner_radius=0,                     
                     width=140,                     
                     height=140,                     
                     command=lambda i=i: controller.show_frame(pages[i])                 
                 )                 
-                btn.place(x=x_pos, y=180)
+                btn.place(x=x_pos, y=300)
                 #pywinstyles.set_opacity(btn, value=0.9,color="#000001")
 
             # ปรับขนาดและตำแหน่งของ label
@@ -2820,12 +2820,12 @@ class ReportFrame(ctk.CTkFrame):
                 fg_color="#A8DADC",                 
                 bg_color="#000001",                 
                 text_color="#000000",                 
-                corner_radius=15,                 
-                font=("TH Sarabun New", 20, "bold"),
-                width=200,
+                corner_radius=0,                 
+                font=("TH Sarabun New", 30, "bold"),
+                width=300,
                 height=40             
             )             
-            label.place(x=x_pos - 30, y=340) 
+            label.place(x=x_pos - 65, y=480) 
             ##pywinstyles.set_opacity(label, value=0.9,color="#000001")
         
 class Report1(ctk.CTkFrame):
@@ -2833,7 +2833,7 @@ class Report1(ctk.CTkFrame):
         super().__init__(parent)
         self.controller = controller
         self.page = 1
-        self.rows_per_page = 4  # ลดจาก 6 เป็น 4 เพื่อให้เหมาะกับความสูง 600px
+        self.rows_per_page = 6 
         self.data = []
 
         # พื้นหลังธีมเครื่องจ่ายยา - ปรับขนาดเป็น 1024x600
@@ -2886,9 +2886,9 @@ class Report1(ctk.CTkFrame):
             self,
             fg_color="#FFFFFF",
             bg_color="#000001",
-            corner_radius=15,
+            corner_radius=0,
             width=750,
-            height=420
+            height=550
         )
         self.table_frame.place(relx=0.5, rely=0.15, anchor="n")
         #pywinstyles.set_opacity( self.table_frame, value=0.9,color="#000001")
@@ -2902,7 +2902,7 @@ class Report1(ctk.CTkFrame):
         self.scrollable_frame = ctk.CTkScrollableFrame(
             self.table_frame,
             width=680,
-            height=340,
+            height=500,
             fg_color="transparent"
         )
         self.scrollable_frame.pack(fill="both", expand=True, padx=15, pady=15)
@@ -3122,11 +3122,10 @@ class Report2(ctk.CTkFrame):
         # ✅ กล่องใหญ่สำหรับหัวข้อ + คำแนะนำจาก AI - ปรับขนาดและตำแหน่ง
         self.advice_card = ctk.CTkFrame(self,
                                         width=950,
-                                        height=180,
-                                        bg_color="#000001" ,
+                                        height=250,
                                         fg_color="#FFFFFF",  # สีฟ้าอ่อน
-                                        corner_radius=15)
-        self.advice_card.place(relx=0.5, rely=0.68, anchor="center")
+                                        corner_radius=0)
+        self.advice_card.place(relx=0.5, rely=0.70, anchor="center")
         #pywinstyles.set_opacity(self.advice_card, value=0.9,color="#000001")
 
         # ✅ หัวข้อในกล่อง - ปรับขนาดฟอนต์
@@ -3139,7 +3138,7 @@ class Report2(ctk.CTkFrame):
         # ✅ Textbox สำหรับเนื้อหา AI - ปรับขนาด
         self.advice_textbox = ctk.CTkTextbox(self.advice_card,
                                              width=920,
-                                             height=130,
+                                             height=230,
                                              wrap="word",
                                              font=("Arial", 18),
                                              fg_color="white",
@@ -3153,7 +3152,7 @@ class Report2(ctk.CTkFrame):
 
         # === Parent Frame ===
         parent_frame = ctk.CTkFrame(
-            self, width=920, height=200, corner_radius=15,
+            self, width=920, height=250, corner_radius=0,
             fg_color="#FFFFFF", bg_color="#000001"
         )
         parent_frame.place(relx=0.5, rely=0.35, anchor="center")
@@ -3161,7 +3160,7 @@ class Report2(ctk.CTkFrame):
         
         # === Scrollable Child ===
         self.scroll_frame = ctk.CTkScrollableFrame(
-            parent_frame, width=880, height=160, fg_color="white"
+            parent_frame, width=880, height=230, fg_color="white"
         )
         self.scroll_frame.place(relx=0.5, rely=0.5, anchor="center")
         
@@ -3360,7 +3359,7 @@ class Wificonnect(ctk.CTkFrame):
         # === โหลดภาพและสร้าง CTkImage ===
         self.bg_ctk_image = ctk.CTkImage(
             light_image=Image.open(f"{PATH}image/wifi.png").resize((1024, 800)), 
-            size=(1024, 600)
+            size=(1024, 800)
         )
         self.internet_ctk_image = ctk.CTkImage(
             light_image=Image.open(f"{PATH}image/internet.png").resize((32, 32)), 
@@ -3408,7 +3407,7 @@ class Wificonnect(ctk.CTkFrame):
             self,
             width=700,
             height=380,
-            corner_radius=25,
+            corner_radius=0,
             fg_color="white",
             border_width=1,
             border_color="#E2E8F0",
