@@ -46,6 +46,73 @@ Heart_report = heart_report()
 medicine_report = eat_medicine_report()
 # -----------------------------------------------------
 
+# ===== Global Keyboard Functions (เพิ่มหลัง imports) =====
+def show_onboard():
+    """แสดง Onboard keyboard"""
+    try:
+        subprocess.Popen(['onboard'], 
+                       stdout=subprocess.DEVNULL, 
+                       stderr=subprocess.DEVNULL)
+    except Exception as e:
+        print(f"Cannot show keyboard: {e}")
+
+def hide_onboard():
+    """ซ่อน Onboard keyboard"""
+    try:
+        subprocess.run(['killall', 'onboard'], 
+                      stdout=subprocess.DEVNULL, 
+                      stderr=subprocess.DEVNULL)
+    except Exception as e:
+        print(f"Cannot hide keyboard: {e}")
+
+def create_entry_with_keyboard(parent, **kwargs):
+    """สร้าง Entry ที่เรียก keyboard อัตโนมัติ"""
+    entry = ctk.CTkEntry(parent, **kwargs)
+    entry.bind('<Button-1>', lambda e: show_onboard())
+    entry.bind('<FocusIn>', lambda e: show_onboard())
+    entry.bind('<FocusOut>', lambda e: hide_onboard())
+    return entry
+
+def setup_global_click_handler(window):
+    """ตั้งค่า handler สำหรับคลิกที่พื้นที่ว่าง"""
+    def on_global_click(event):
+        widget = event.widget
+        
+        # ตรวจสอบว่า widget หรือ parent ของมันเป็น Entry/Textbox หรือไม่
+        current = widget
+        is_input_widget = False
+        
+        # ตรวจสอบ widget และ parent ย้อนขึ้นไป 5 ระดับ
+        for _ in range(5):
+            if isinstance(current, (ctk.CTkEntry, ctk.CTkTextbox)):
+                is_input_widget = True
+                break
+            if hasattr(current, 'master'):
+                current = current.master
+            else:
+                break
+        
+        # ถ้าไม่ได้คลิกที่ input ให้ซ่อน keyboard
+        if not is_input_widget:
+            hide_onboard()
+    
+    window.bind_all('<Button-1>', on_global_click)
+
+def toggle_language():
+    """สลับภาษาไทย ↔ อังกฤษ"""
+    try:
+        # ตรวจสอบ layout ปัจจุบัน
+        result = subprocess.run(["setxkbmap", "-query"], capture_output=True, text=True)
+        if "th" in result.stdout:
+            # ถ้าเป็นไทย ให้สลับเป็นอังกฤษ
+            subprocess.run(["setxkbmap", "us"])
+            print("Switched to English")
+        else:
+            # ถ้าเป็นอังกฤษ ให้สลับเป็นไทย
+            subprocess.run(["setxkbmap", "th"])
+            print("เปลี่ยนเป็นภาษาไทยแล้ว")
+    except Exception as e:
+        print(f"Error switching language: {e}")
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("green")
@@ -70,7 +137,16 @@ LABEL_FONT_FAMILY = "Arial"
 
 class login(ctk.CTkFrame):     
     def on_show(self):         
-        print("login is now visible")      
+        print("login is now visible")     
+        show_onboard() 
+        # เพิ่มส่วนนี้
+        def on_frame_click(event):
+            widget = event.widget
+            if not isinstance(widget, (ctk.CTkEntry, ctk.CTkTextbox)):
+                hide_onboard()
+        
+        self.bind('<Button-1>', on_frame_click)
+
     def __init__(self, parent, controller):         
         super().__init__(parent)         
         self.controller = controller          
@@ -106,6 +182,21 @@ class login(ctk.CTkFrame):
         )
         logo_frame.grid(row=0, column=0, columnspan=2, pady=(40, 20))
         
+        lang_button = ctk.CTkButton(
+            frame,  # หรือ parent ที่คุณต้องการวางปุ่ม
+            text="TH/EN",
+            width=50,
+            height=50,
+            corner_radius=10,
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
+            text_color="white",
+            font=("Arial", 10, "bold"),
+            command=toggle_language
+            )
+        lang_button.place(x=300, y=40)  # ปรับตำแหน่งตามต้องการ
+
+        
         # === ไอคอนโลโก้ (Logo Icon) ===
         try:
             logo_login_img = Image.open(f"{PATH}image/login-icon.png").resize((40, 40), Image.Resampling.LANCZOS)
@@ -126,7 +217,7 @@ class login(ctk.CTkFrame):
             text="ลงชื่อเข้าใช้ด้วยอีเมล",             
             font=("Arial", 28, "bold"),             
             text_color="#1a1a1a",         
-        ).grid(row=1, column=0, columnspan=2, pady=(0, 10))     
+        ).grid(row=1, column=0, columnspan=2, pady=(20, 10))     
         
         # === คำอธิบาย (Description) ===
         ctk.CTkLabel(             
@@ -141,20 +232,19 @@ class login(ctk.CTkFrame):
         self.username = ctk.StringVar()         
         self.password = ctk.StringVar()          
         
-        # === ช่องกรอกอีเมล (Email Input Field) ===
+        # === ช่องกรอกอีเมล - แก้ไขส่วนนี้ ===
         email_frame = ctk.CTkFrame(frame, fg_color="#F8F9FA", corner_radius=8, height=50)
         email_frame.grid(row=3, column=0, columnspan=2, padx=30, pady=(0, 15), sticky="ew")
         email_frame.grid_columnconfigure(1, weight=1)
 
-        # ไอคอนอีเมล
         email_icon = Image.open(f"{PATH}image/email.png").resize((24, 24), Image.Resampling.LANCZOS)
         self.email_ctk_image = ctk.CTkImage(light_image=email_icon, size=(24, 24))
         ctk.CTkLabel(email_frame, image=self.email_ctk_image, text="").grid(
             row=0, column=0, padx=(15, 10), pady=12, sticky="w"
         )
 
-        # ช่องกรอกอีเมล
-        email_entry = ctk.CTkEntry(
+        # ✅ ใช้ create_entry_with_keyboard แทน CTkEntry
+        email_entry = create_entry_with_keyboard(
             email_frame,
             textvariable=self.username,
             placeholder_text="Email",
@@ -165,20 +255,19 @@ class login(ctk.CTkFrame):
         )
         email_entry.grid(row=0, column=1, padx=(0, 15), pady=12, sticky="ew")
         
-        # === ช่องกรอกรหัสผ่าน (Password Input Field) ===
+        # === ช่องกรอกรหัสผ่าน - แก้ไขส่วนนี้ ===
         password_frame = ctk.CTkFrame(frame, fg_color="#F8F9FA", corner_radius=8, height=50)
         password_frame.grid(row=4, column=0, columnspan=2, padx=30, pady=(0, 15), sticky="ew")
         password_frame.grid_columnconfigure(1, weight=1)
 
-        # ไอคอนรหัสผ่าน
         padlock_icon = Image.open(f"{PATH}image/padlock.png").resize((24, 24), Image.Resampling.LANCZOS)
         self.padlock_ctk_image = ctk.CTkImage(light_image=padlock_icon, size=(24, 24))
         ctk.CTkLabel(password_frame, image=self.padlock_ctk_image, text="").grid(
             row=0, column=0, padx=(15, 10), pady=12, sticky="w"
         )
 
-        # ช่องกรอกรหัสผ่าน
-        self.password_entry = ctk.CTkEntry(
+        # ✅ ใช้ create_entry_with_keyboard แทน CTkEntry
+        self.password_entry = create_entry_with_keyboard(
             password_frame,
             textvariable=self.password,
             placeholder_text="Password",
@@ -189,6 +278,7 @@ class login(ctk.CTkFrame):
             show="*"
         )
         self.password_entry.grid(row=0, column=1, padx=(0, 10), pady=12, sticky="ew")
+      
 
         # ปุ่มแสดง/ซ่อนรหัสผ่าน
         eye_closed_icon = Image.open(f"{PATH}image/eye_closed.png").resize((24, 24), Image.Resampling.LANCZOS)
@@ -273,13 +363,13 @@ class HomePage(ctk.CTkFrame):
         # ไอคอน battery และ wifi
         self.add_status_icons()
         # วันที่และเวลา
-        self.date_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 42, "bold"),
+        self.date_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 40, "bold"),
                                        fg_color="#8acaef", text_color="white")
-        self.date_label.place(x=70, y=182)
+        self.date_label.place(x=70, y=185)
 
-        self.time_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 42, "bold"),
+        self.time_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 40, "bold"),
                                        fg_color="#8acaef", text_color="white")
-        self.time_label.place(x=360, y=182)
+        self.time_label.place(x=360, y=185)
 
         # สร้างส่วนแสดงข้อมูลการตั้งค่ายา
         self.create_medication_display()
@@ -717,12 +807,13 @@ class HomePage(ctk.CTkFrame):
                     info_label = ctk.CTkLabel(
                         info_card,
                         text=info,
-                        font=("TH Sarabun New", 20, "bold"),
+                        font=("TH Sarabun New", 16, "bold"),
                         text_color="#000000",
                         fg_color="transparent",
-                        justify="left"
+                        justify="left",
+                        anchor="w"
                     )
-                    info_label.pack(pady=5, padx=10, fill="x")
+                    info_label.pack(pady=5, padx=10, fill="x",anchor="w")
                     
                     self.user_info_labels.append(info_card)
                     self.user_info_labels.append(info_label)
@@ -801,7 +892,7 @@ class HomePage(ctk.CTkFrame):
                             date_label = ctk.CTkLabel(
                                 date_card,
                                 text=date_info,
-                                font=("TH Sarabun New", 18, "bold"),
+                                font=("TH Sarabun New", 14, "bold"),
                                 text_color="#155724",
                                 fg_color="transparent"
                             )
@@ -1019,7 +1110,7 @@ class Frame2(ctk.CTkFrame):
 
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")
+        navbar.pack(side="bottom", fill="x",pady=50)
 
 
         page_title = ctk.CTkLabel(
@@ -1276,7 +1367,7 @@ class Frame3(ctk.CTkFrame):
         
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")
+        navbar.pack(side="bottom", fill="x",pady=50)
 
 
         page_title = ctk.CTkLabel(
@@ -1332,10 +1423,116 @@ class Frame3(ctk.CTkFrame):
         self.controller.show_frame(MedicationScheduleFrame)
 
 
-class Frame4(ctk.CTkFrame):
-    def on_show(self):
-        print("Frame4 is now visible")
+# เพิ่ม class HealthNumpad ในไฟล์ main.py
 
+class HealthNumpad(ctk.CTkToplevel):
+    def __init__(self, parent, entry, max_length=3):
+        super().__init__(parent)
+        self.entry = entry
+        self.max_length = max_length
+        self.title("กรอกตัวเลข")
+        self.configure(fg_color="#f0f0f0")
+        
+        self.update()
+        self.geometry("450x600+300+50")
+        self.update_idletasks()
+        
+        self.transient(parent)
+        self.lift()
+        self.focus_force()
+        
+        self.protocol("WM_DELETE_WINDOW", self.close_numpad)
+        
+        # === Display ===
+        display_frame = ctk.CTkFrame(self, fg_color="white", corner_radius=15, height=80)
+        display_frame.pack(pady=20, padx=20, fill="x")
+        
+        self.display_label = ctk.CTkLabel(
+            display_frame, 
+            text=self.entry.get() or "0",
+            font=("Arial", 48, "bold"),
+            text_color="#2563EB"
+        )
+        self.display_label.pack(pady=15)
+        
+        # === ปุ่มตัวเลข ===
+        frame = ctk.CTkFrame(self, fg_color="#ffffff", corner_radius=15)
+        frame.pack(pady=10, padx=20)
+        
+        buttons = [
+            ("7", 0, 0), ("8", 0, 1), ("9", 0, 2),
+            ("4", 1, 0), ("5", 1, 1), ("6", 1, 2),
+            ("1", 2, 0), ("2", 2, 1), ("3", 2, 2),
+            ("0", 3, 0,), ("⌫", 3, 1), ("ยืนยัน", 3, 2)
+        ]
+        
+        for item in buttons:
+            text = item[0]
+            row = item[1]
+            col = item[2]
+            colspan = item[3] if len(item) > 3 else 1
+            
+            btn = ctk.CTkButton(
+                frame, 
+                text=text, 
+                font=("Arial", 28, "bold"),
+                width=100 if colspan == 1 else 220,
+                height=85,
+                corner_radius=15,
+                fg_color="#e0e0e0",
+                hover_color="#c0c0c0",
+                text_color="black"
+            )
+            
+            if text == "⌫":
+                btn.configure(fg_color="#ff6b6b", hover_color="#ee5a52", text_color="white")
+                btn.configure(command=lambda x=text: self.on_button_click(x))
+            elif text == "ยืนยัน":
+                btn.configure(fg_color="#2563EB", hover_color="#1D4ED8", text_color="white",
+                              command=self.close_numpad)
+            else:
+                btn.configure(command=lambda x=text: self.on_button_click(x))
+            
+            btn.grid(row=row, column=col, columnspan=colspan, padx=8, pady=8)
+    
+    def update_display(self):
+        value = self.entry.get() or "0"
+        self.display_label.configure(text=value)
+    
+    def on_button_click(self, value):
+        self.entry.configure(state="normal")
+        current_text = self.entry.get()
+        
+        if value == "⌫":
+            if len(current_text) > 0:
+                self.entry.delete(len(current_text) - 1, "end")
+                self.update_display()
+        elif len(current_text) < self.max_length:
+            if current_text == "0":
+                self.entry.delete(0, "end")
+            self.entry.insert("end", value)
+            self.update_display()
+        
+        self.entry.configure(state="readonly")
+    
+    def clear_entry(self):
+        self.entry.configure(state="normal")
+        self.entry.delete(0, "end")
+        self.update_display()
+        self.entry.configure(state="readonly")
+    
+    def close_numpad(self):
+        self.entry.configure(state="normal")
+        if len(self.entry.get().strip()) == 0:
+            self.entry.insert(0, "0")
+        self.entry.configure(state="readonly")
+        self.destroy()
+
+
+# แก้ไข Frame4 - เปลี่ยนฟังก์ชัน create_input
+class Frame4(ctk.CTkFrame):
+    # ... (ส่วนอื่นๆ ไม่ต้องแก้)
+    
     def __init__(self, parent, controller):
         super().__init__(parent, width=1024, height=800)
         self.controller = controller
@@ -1345,11 +1542,9 @@ class Frame4(ctk.CTkFrame):
         bg_label = ctk.CTkLabel(self, image=self.bg_ctk_image, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-        # กรอบหลัก
         frame = ctk.CTkFrame(self, width=800, height=400, corner_radius=0, fg_color="#FFFFFF", bg_color="#000001") 
         frame.place(relx=0.5, rely=0.5, anchor="center")
 
-        # === หัวข้อกล่อง ===
         title_label = ctk.CTkLabel(
             frame,
             text="วัดความดันและชีพจร",
@@ -1360,7 +1555,7 @@ class Frame4(ctk.CTkFrame):
 
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")
+        navbar.pack(side="bottom", fill="x",pady=50)
 
         page_title = ctk.CTkLabel(
             navbar,
@@ -1395,12 +1590,39 @@ class Frame4(ctk.CTkFrame):
         self.diastolic_var = ctk.StringVar()
         self.pulse_var = ctk.StringVar()
 
+        # ⭐ แก้ไขฟังก์ชัน create_input ให้มี Numpad
         def create_input(label_text, var, row):
-            label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 22), text_color="black") 
-            entry = ctk.CTkEntry(frame, textvariable=var, width=600, height=60, 
-                                 font=("Arial", 22), fg_color="white", text_color="black") 
+            label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 22), text_color="black")
             label.grid(row=row, column=0, padx=20, pady=(10, 0), sticky="w")
-            entry.grid(row=row+1, column=0, columnspan=2, padx=20, pady=(0, 10), sticky="ew")
+            
+            # สร้าง frame สำหรับ entry + ปุ่ม numpad
+            input_frame = ctk.CTkFrame(frame, fg_color="transparent")
+            input_frame.grid(row=row+1, column=0, columnspan=2, padx=20, pady=(0, 10), sticky="ew")
+            
+            entry = ctk.CTkEntry(
+                input_frame, 
+                textvariable=var, 
+                width=500, 
+                height=60,
+                font=("Arial", 22), 
+                fg_color="white", 
+                text_color="black",
+                state="readonly"
+            )
+            entry.pack(side="left", padx=(0, 10))
+            
+            numpad_btn = ctk.CTkButton(
+                input_frame,
+                text="⌨",
+                font=("Arial", 32),
+                width=80,
+                height=60,
+                corner_radius=15,
+                fg_color="#2563EB",
+                hover_color="#1D4ED8",
+                command=lambda: HealthNumpad(self, entry, max_length=3)
+            )
+            numpad_btn.pack(side="left")
 
         create_input("ความดันสูงสุด (Systolic)", self.systolic_var, 1)
         create_input("ความดันต่ำสุด (Diastolic)", self.diastolic_var, 3)
@@ -1414,13 +1636,6 @@ class Frame4(ctk.CTkFrame):
             print("ข้อมูลถูกล้างเรียบร้อยแล้ว")
 
         def save_and_go_home():
-            message = f'''
-            📊 รายงานสุขภาพ\n
-            👤 ชื่อผู้ใช้งาน: {self.controller.user['firstname_th']} - {self.controller.user['lastname_th']}\n
-            💓 ความดันสูง: {self.systolic_var.get()} mmHg\n
-            💓 ความดันต่ำ: {self.diastolic_var.get()} mmHg\n
-            💓 ชีพจร: {self.pulse_var.get()} bpm
-            '''
             if len(self.systolic_var.get().strip()) == 0 and len(self.diastolic_var.get().strip()) == 0 and len(self.pulse_var.get().strip()) == 0:
                 print('กรุณากรอกข้อมูลให้ครบถ้วน')
                 return
@@ -1447,6 +1662,12 @@ class Frame4(ctk.CTkFrame):
 class add_Frame(ctk.CTkFrame):
     def on_show(self):
         print("add_Frame is now visible")
+        show_onboard()
+        # เพิ่มส่วนนี้
+        def on_frame_click(event):
+            widget = event.widget
+            if not isinstance(widget, (ctk.CTkEntry, ctk.CTkTextbox)):
+                hide_onboard()
 
     def __init__(self, parent, controller):
         super().__init__(parent, width=1024, height=600)
@@ -1461,7 +1682,7 @@ class add_Frame(ctk.CTkFrame):
 
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")
+        navbar.pack(side="bottom", fill="x",pady=50)
 
         page_title = ctk.CTkLabel(
             navbar,
@@ -1530,7 +1751,21 @@ class add_Frame(ctk.CTkFrame):
                     font=("TH Sarabun New", 40, "bold"), 
                     text_color="#1D3557"
                 )
-                self.label_title.grid(row=0, column=0, columnspan=2, pady=(15, 25), sticky="w", padx=(220, 0))
+                self.label_title.grid(row=0, column=0, columnspan=2, pady=(15, 25), sticky="w", padx=(220, 20))
+
+                self.lang_button = ctk.CTkButton(
+                    self,  # หรือ parent ที่คุณต้องการวางปุ่ม
+                    text="TH/EN",
+                    width=50,
+                    height=50,
+                    corner_radius=10,
+                    fg_color="#2563EB",
+                    hover_color="#1D4ED8",
+                    text_color="white",
+                    font=("Arial", 10, "bold"),
+                    command=toggle_language
+                )
+                self.lang_button.place(x=500, y=20)  # ปรับตำแหน่งตามต้องการ
 
                 # Subtitle
                 self.label_subtitle = ctk.CTkLabel(
@@ -1541,11 +1776,13 @@ class add_Frame(ctk.CTkFrame):
                 self.label_subtitle.grid(row=0, column=0, columnspan=2, pady=(50, 10), sticky="w", padx=(220, 0))
 
                 # Enhanced Entry Field
-                self.entry_med_name = ctk.CTkEntry(
-                    self, placeholder_text="ป้อนชื่อยา...", 
-                    width=450, height=50,
-                    fg_color="#FFFFFF", 
-                    text_color="#1D3557", 
+                self.entry_med_name = create_entry_with_keyboard(
+                    self,
+                    placeholder_text="ป้อนชื่อยา...",
+                    width=450,
+                    height=50,
+                    fg_color="#FFFFFF",
+                    text_color="#1D3557",
                     font=("TH Sarabun New", 18),
                     corner_radius=15
                 )
@@ -1567,12 +1804,14 @@ class add_Frame(ctk.CTkFrame):
             def add_medication_entry(self):
                 row_index = len(self.med_entries) + 2
                 
-                # Enhanced dynamic entry
-                entry = ctk.CTkEntry(
-                    self, placeholder_text="ป้อนชื่อยา...", 
-                    width=450, height=50,
-                    fg_color="#FFFFFF", 
-                    text_color="#1D3557", 
+                # ✅ ใช้ create_entry_with_keyboard แทน CTkEntry
+                entry = create_entry_with_keyboard(
+                    self,
+                    placeholder_text="ป้อนชื่อยา...",
+                    width=450,
+                    height=50,
+                    fg_color="#FFFFFF",
+                    text_color="#1D3557",
                     font=("TH Sarabun New", 18),
                     corner_radius=15
                 )
@@ -1746,7 +1985,7 @@ class AIgen(ctk.CTkFrame):
 
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")
+        navbar.pack(side="bottom", fill="x",pady=50)
 
         page_title = ctk.CTkLabel(
             navbar,
@@ -1873,7 +2112,7 @@ class MedicationApp(ctk.CTkFrame):
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 
         self.navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        self.navbar.pack(side="bottom", fill="x")
+        self.navbar.pack(side="bottom", fill="x",pady=50)
 
 
         self.page_title = ctk.CTkLabel(
@@ -2296,14 +2535,14 @@ class info(ctk.CTkFrame):
 
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")
+        navbar.pack(side="bottom", fill="x", pady=50)
 
         page_title = ctk.CTkLabel(
             navbar,
             text="ข้อมูลตัวเครื่อง",
             font=("TH Sarabun New", 28, "bold"),
             text_color="black"
-        )
+        )  
         page_title.pack(side="left", padx=20)
 
         def go_back():
@@ -2493,7 +2732,7 @@ class MedicationScheduleFrame(ctk.CTkFrame):
         frame_date.pack(fill="x", padx=15, pady=(5, 10))
 
         date_entry = ctk.CTkEntry(frame_date, width=250, height=55,
-                                  font=("TH Sarabun New", 30,"bold"),text_color="#000000", 
+                                  font=("TH Sarabun New", 24,"bold"),text_color="#000000", 
                                   corner_radius=8, border_width=2,
                                   border_color="#0077b6", fg_color="white")  
         date_entry.pack(side="left", padx=15, pady=10)
@@ -2501,7 +2740,7 @@ class MedicationScheduleFrame(ctk.CTkFrame):
         # ปุ่มเปิดปฏิทินแบบสวย
         pick_date_btn = ctk.CTkButton(
             frame_date, text="เลือกวัน", width=140, height=55,
-            font=("TH Sarabun New", 20, "bold"), corner_radius=8,
+            font=("TH Sarabun New", 15, "bold"), corner_radius=8,
             fg_color="#0077b6", hover_color="#023e8a",
             border_width=2, border_color="#023e8a"
         )
@@ -2529,7 +2768,7 @@ class MedicationScheduleFrame(ctk.CTkFrame):
         frame_date2.pack(fill="x", padx=15, pady=(5, 15))
 
         end_entry = ctk.CTkEntry(frame_date2, width=250, height=55,
-                                 font=("TH Sarabun New", 30,"bold"),text_color="#000000",
+                                 font=("TH Sarabun New", 24,"bold"),text_color="#000000",
                                  corner_radius=8, border_width=2,
                                  border_color="#e63946", fg_color="white")
         end_entry.pack(side="left", padx=15, pady=10)
@@ -2547,7 +2786,7 @@ class MedicationScheduleFrame(ctk.CTkFrame):
 
         # === Navbar แบบ Gradient ===
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")
+        navbar.pack(side="bottom", fill="x",pady=50)
 
 
         # Title container พร้อมไอคอน
@@ -2742,7 +2981,7 @@ class ReportFrame(ctk.CTkFrame):
 
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")     
+        navbar.pack(side="bottom", fill="x",pady=50)     
         
         page_title = ctk.CTkLabel(
             navbar,
@@ -2821,7 +3060,7 @@ class ReportFrame(ctk.CTkFrame):
                 bg_color="#000001",                 
                 text_color="#000000",                 
                 corner_radius=0,                 
-                font=("TH Sarabun New", 30, "bold"),
+                font=("TH Sarabun New", 25, "bold"),
                 width=300,
                 height=40             
             )             
@@ -2844,7 +3083,7 @@ class Report1(ctk.CTkFrame):
 
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")
+        navbar.pack(side="bottom", fill="x",pady=50)
 
         page_title = ctk.CTkLabel(navbar,           text="ตารางแสดงข้อมูลยา",
             font=("TH Sarabun New", 28, "bold"),
@@ -3077,7 +3316,7 @@ class Report2(ctk.CTkFrame):
 
         # Navbar
         navbar = ctk.CTkFrame(self, height=60, fg_color="#A8DADC", corner_radius=0)
-        navbar.pack(side="bottom", fill="x")
+        navbar.pack(side="bottom", fill="x",pady=50)
 
         page_title = ctk.CTkLabel(
             navbar,
@@ -3122,10 +3361,10 @@ class Report2(ctk.CTkFrame):
         # ✅ กล่องใหญ่สำหรับหัวข้อ + คำแนะนำจาก AI - ปรับขนาดและตำแหน่ง
         self.advice_card = ctk.CTkFrame(self,
                                         width=950,
-                                        height=250,
+                                        height=230,
                                         fg_color="#FFFFFF",  # สีฟ้าอ่อน
                                         corner_radius=0)
-        self.advice_card.place(relx=0.5, rely=0.70, anchor="center")
+        self.advice_card.place(relx=0.5, rely=0.67, anchor="center")
         #pywinstyles.set_opacity(self.advice_card, value=0.9,color="#000001")
 
         # ✅ หัวข้อในกล่อง - ปรับขนาดฟอนต์
@@ -3138,7 +3377,7 @@ class Report2(ctk.CTkFrame):
         # ✅ Textbox สำหรับเนื้อหา AI - ปรับขนาด
         self.advice_textbox = ctk.CTkTextbox(self.advice_card,
                                              width=920,
-                                             height=230,
+                                             height=200,
                                              wrap="word",
                                              font=("Arial", 18),
                                              fg_color="white",
@@ -3211,23 +3450,34 @@ class Report2(ctk.CTkFrame):
     def show_advice_popup(self, advice_text):
         popup = ctk.CTkToplevel(self)
         popup.title("คำแนะนำจาก AI")
-        popup.geometry("500x350")  # ปรับขนาด popup ให้เหมาะสม
-        popup.grab_set()
-
+        popup.geometry("500x350")
         popup.configure(fg_color="white")
 
-        label = ctk.CTkLabel(popup, text="คำแนะนำจาก AI", font=("Arial", 20, "bold"), text_color="black")
+        popup.transient(self)
+        popup.attributes('-topmost', True)  # ใช้ topmost แทน
+
+        label = ctk.CTkLabel(popup, text="คำแนะนำจาก AI", 
+                        font=("Arial", 20, "bold"), text_color="black")
         label.pack(pady=8)
 
-        textbox = ctk.CTkTextbox(popup, width=450, height=220, wrap="word", font=("Arial", 18),
-                                 fg_color="white", text_color="black")
+        textbox = ctk.CTkTextbox(popup, width=450, height=220, wrap="word", 
+                            font=("Arial", 18), fg_color="white", text_color="black")
         textbox.insert("1.0", advice_text)
         textbox.configure(state="disabled")
         textbox.pack(pady=8)
 
         close_btn = ctk.CTkButton(popup, text="ปิด", command=popup.destroy,
-                                  fg_color="#495057", hover_color="#FF0000", text_color="white")
+                                  fg_color="#495057", hover_color="#FF0000", 
+                                  text_color="white")
         close_btn.pack(pady=8)
+        popup.focus_force()  # ให้ focus ที่ popup
+
+    def _set_grab_safely(self, window):
+        try:
+            window.grab_set()
+        except Exception as e:
+            print(f"Cannot grab window: {e}")
+            # ถ้า grab ไม่ได้ก็ไม่เป็นไร popup ยังใช้งานได้ปกติ
 
     def display_data(self, data, advices):
         # ปรับขนาดฟอนต์ของ header
@@ -3343,6 +3593,12 @@ class Wificonnect(ctk.CTkFrame):
     def on_show(self):
         print("Wificonnect is now visible")
         self.update_wifi_list()
+        show_onboard()
+        # เพิ่มส่วนนี้
+        def on_frame_click(event):
+            widget = event.widget
+            if not isinstance(widget, (ctk.CTkEntry, ctk.CTkTextbox)):
+                hide_onboard()
 
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -3445,6 +3701,21 @@ class Wificonnect(ctk.CTkFrame):
         )
         self.refresh_button.pack(side="right")
 
+        self.lang_button = ctk.CTkButton(
+            header_frame,  # หรือ parent ที่คุณต้องการวางปุ่ม
+            text="TH/EN",
+            width=50,
+            height=40,
+            corner_radius=10,
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
+            text_color="white",
+            font=("Arial", 10, "bold"),
+            command=toggle_language
+            )
+        self.lang_button.pack(side="right")
+
+
         # === WiFi List Container ===
         content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         content_frame.pack(fill="both", expand=True, padx=30, pady=(0, 20))
@@ -3460,7 +3731,7 @@ class Wificonnect(ctk.CTkFrame):
 
         # === Bottom Navbar ===
         navbar = ctk.CTkFrame(self, height=120, fg_color="white", border_width=1, border_color="#E2E8F0")
-        navbar.pack(side="bottom", fill="x")
+        navbar.pack(side="bottom", fill="x", pady=40)
 
         button_container = ctk.CTkFrame(navbar, fg_color="transparent")
         button_container.pack(expand=True, fill="both", padx=20, pady=20)
@@ -3533,6 +3804,7 @@ class Wificonnect(ctk.CTkFrame):
             text_color=self.text_dark
         )
         title_label.pack(side="left", padx=(10, 0))
+        
 
         input_frame = ctk.CTkFrame(self.password_frame, fg_color="transparent")
         input_frame.pack(fill="x", padx=30, pady=10)
@@ -3549,12 +3821,17 @@ class Wificonnect(ctk.CTkFrame):
         key_icon_label = ctk.CTkLabel(password_input_frame, image=self.internet_ctk_image, text="")
         key_icon_label.pack(side="left", padx=(15, 10), pady=12)
 
-        self.password_entry = ctk.CTkEntry(
-            password_input_frame, show="*", placeholder_text="กรอกรหัสผ่าน...", font=("Arial", 16),
-            fg_color="white", border_width=0, text_color=self.text_dark
+        self.password_entry = create_entry_with_keyboard(
+            password_input_frame,
+            show="*",
+            placeholder_text="กรอกรหัสผ่าน...",
+            font=("Arial", 16),
+            fg_color="white",
+            border_width=0,
+            text_color=self.text_dark
         )
         self.password_entry.pack(side="left", fill="x", expand=True, padx=(0, 50), pady=12)
-
+        
         self.show_pass_var = ctk.BooleanVar(value=False)
         self.show_pass_btn = ctk.CTkButton(
             password_input_frame, image=self.eye_closed_ctk_image,text="",
@@ -3738,6 +4015,9 @@ class MainApp(ctk.CTk):
             self.frames[F] = frame
             frame.place(relwidth=1, relheight=1)
         
+        # เพิ่มบรรทัดนี้
+        setup_global_click_handler(self)
+        
         # โหลดข้อมูลผู้ใช้และแสดงหน้าที่เหมาะสม
         self.load_user_data()
     
@@ -3767,7 +4047,10 @@ class MainApp(ctk.CTk):
             frame = self.frames[frame_class]
             frame.lift()
             
-            # เรียก on_show method หากมี
+            # ซ่อน keyboard เมื่อเปลี่ยนหน้า
+            if frame_class not in [login, Wificonnect, add_Frame]:
+                hide_onboard()
+            
             if hasattr(frame, 'on_show'):
                 frame.on_show()
             else:
@@ -3777,6 +4060,7 @@ class MainApp(ctk.CTk):
             print(f"ไม่พบ frame: {frame_class}")
         except Exception as e:
             print(f"เกิดข้อผิดพลาดในการแสดง frame: {e}")
+
     
     def set_fullscreen(self, enable=True):
         """ตั้งค่าโหมด fullscreen"""
