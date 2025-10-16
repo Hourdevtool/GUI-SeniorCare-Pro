@@ -18,7 +18,7 @@ async def generateheart_pdf(id):
         await page.pdf(path=heartpdf_file, format="A4")
         await browser.close()
 
-        open_or_print(heartpdf_file, print_file=True)  # เลือกว่าจะเปิดหรือพิมพ์
+        open_or_print(heartpdf_file)  # เลือกว่าจะเปิดหรือพิมพ์
         print(f"PDF สร้างเสร็จแล้ว: {heartpdf_file}")
 
 
@@ -33,21 +33,18 @@ async def generahistory_pdf(id):
         await page.pdf(path=historypdf_file, format="A4")
         await browser.close()
 
-        open_or_print(historypdf_file, print_file=True)
+        open_or_print(historypdf_file)
         print(f"PDF สร้างเสร็จแล้ว: {historypdf_file}")
 
 
-def open_or_print(filepath, print_file=False):
+def open_or_print(filepath):
     if os.name == "nt":  # Windows
          os.startfile(filepath) 
     else:  # Linux / Debian
          try:
-            if print_file:
-                subprocess.run(["lp", filepath])   # สั่งพิมพ์ไฟล์
-            else:
-                subprocess.run(["xdg-open", filepath])  # เปิดไฟล์
+                subprocess.run(["firefox", filepath])  # เปิดไฟล์
          except Exception as e:
-            print(f"ไม่สามารถเปิด/พิมพ์ไฟล์ได้: {e}")
+            print(f"ไม่สามารถเปิดได้: {e}")
 
 
 def generate_pdf_sync(id, advices=None):
