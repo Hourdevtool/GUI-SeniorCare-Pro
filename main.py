@@ -12,7 +12,7 @@ from pywifi import PyWiFi
 from babel.dates import format_date
 # model format เวลา
 from lib.set_time import default_serializer
-from lib.sendTimeToPico import recivetime,start_serial_loop
+from lib.serial_handler import recivetime,start_Serial_loop
 
 # --ใหม่--
 #import pywinstyles
@@ -814,8 +814,6 @@ class HomePage(ctk.CTkFrame):
                 if meal_data and 'data' in meal_data:
                     medications = meal_data['data']
                     recivetime(medications)
-                    # serial_thread = threading.Thread(target=start_serial_loop, daemon=True)
-                    # serial_thread.start()
                     if medications:
                         # แสดงข้อมูลยาในรูปแบบการ์ด
                         for i, med in enumerate(medications):
@@ -3716,7 +3714,12 @@ class MainApp(ctk.CTk):
         self.geometry(f"{width}x{height}+{x}+{y}")
         
         self.advice = ''
-        
+        self.battery_percent_var = ctk.DoubleVar(value=0.0)
+        self.device_status_var = ctk.StringVar(value="0")
+
+        self.device_status_var.trace_add('write', self.status_callback)
+
+
         # สร้าง container frame
         self.container = ctk.CTkFrame(self)
         self.container.pack(fill="both", expand=True)
@@ -3738,7 +3741,39 @@ class MainApp(ctk.CTk):
         
         # โหลดข้อมูลผู้ใช้และแสดงหน้าที่เหมาะสม
         self.load_user_data()
+        self.start_serial_thread()
     
+    def start_serial_thread(self):
+        try:
+            # กำหนด Port และ Baudrate
+            PORT = "/dev/ttyUSB0"
+            BAUDRATE = 115200
+
+            serial_thread = threading.Thread(
+                target=start_Serial_loop, 
+                args=(
+                    PORT, 
+                    BAUDRATE, 
+                    self.battery_percent_var, 
+                    self.device_status_var    
+                ),
+                daemon=True 
+            )
+            serial_thread.start()
+        except Exception as e:
+            print(f"--- [MainApp] FAILED to start serial thread: {e} ---")
+            self.device_status_var.set(f"Serial Error: {e}")
+    # อัพเดตสถานะการจ่ายยา
+    def status_callback(self,*args):
+        new_status = self.device_status_var.get()
+
+        if new_status == 1:
+            print("Action: HELLO")
+            homePage = self.frames[HomePage]
+            homePage.reduce_medicine()
+        else:
+            print("Action: OK")
+
     def load_user_data(self):
         """โหลดข้อมูลผู้ใช้จากไฟล์"""
         if os.path.exists("user_data.json"):
