@@ -814,8 +814,8 @@ class HomePage(ctk.CTkFrame):
                 if meal_data and 'data' in meal_data:
                     medications = meal_data['data']
                     recivetime(medications)
-                    serial_thread = threading.Thread(target=start_serial_loop, daemon=True)
-                    serial_thread.start()
+                    # serial_thread = threading.Thread(target=start_serial_loop, daemon=True)
+                    # serial_thread.start()
                     if medications:
                         # แสดงข้อมูลยาในรูปแบบการ์ด
                         for i, med in enumerate(medications):
@@ -1953,9 +1953,12 @@ class MedicationApp(ctk.CTkFrame):
                 print(medicine_data['message'])
                 return 
 
+        self.time_entries = {}
+        self.time_selects = {}
+        self.med_entries = {"เช้า": [], "กลางวัน": [], "เย็น": [], "ก่อนนอน": []}
+        self.med_combos = {}
+        self.entry_frames = {}
         self.selected_time_periods = {}
-        for i in range(len(self.pages)):
-            self.selected_time_periods[i] = {}
 
         self.pages = []
         self.current_page = 0
@@ -2238,13 +2241,8 @@ class MedicationApp(ctk.CTkFrame):
             print(insert_meal['message'])
             self.controller.show_frame(HomePage)
             meal_data.clear()
-            self.med_combos.clear()
-            self.med_entries = {"เช้า": [], "กลางวัน": [], "เย็น": [], "ก่อนนอน": []}
         else:
             print(insert_meal['message'])
-            meal_data.clear()
-            self.med_combos.clear()
-            self.med_entries = {"เช้า": [], "กลางวัน": [], "เย็น": [], "ก่อนนอน": []}
         
     def on_show(self):
         print("MedicationApp is now visible")
