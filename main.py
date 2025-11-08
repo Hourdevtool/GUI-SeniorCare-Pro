@@ -257,10 +257,20 @@ class HomePage(ctk.CTkFrame):
         print("HomePage is now visible")
         # อัพเดทข้อมูลการตั้งค่ายาเมื่อแสดงหน้า
         self.update_medication_info()
+        self.controller.start_background_polling()
+        
+        if self.controller.last_known_schedule_data:
+            print("Data found in MainApp cache, rendering immediately.")
+            # ถ้ามี, ใช้วาด UI ทันที
+            self._render_medication_data(self.controller.last_known_schedule_data, None)
+        else:
+            # ถ้าไม่มี (เพิ่งเปิดเครื่อง), ให้เริ่มดึงข้อมูลแบบ non-blocking
+            print("No cached data in MainApp, triggering new fetch.")
+            self.update_medication_info()
         # อัพเดทข้อมูลผู้ใช้เมื่อแสดงหน้า
         self.update_user_info()
         self.create_menu_buttons(self.controller)
-        
+       
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
@@ -394,6 +404,7 @@ class HomePage(ctk.CTkFrame):
     def confirm_logout(self):
         response = messagebox.askyesno("ยืนยันออกจากระบบ", "คุณต้องการออกจากระบบหรือไม่?")
         if response:
+            self.controller.stop_background_polling()
             try:
                 if os.path.exists("user_data.json"):
                     os.remove("user_data.json")
@@ -759,137 +770,193 @@ class HomePage(ctk.CTkFrame):
         except Exception as e:
             print(f"เกิดข้อผิดพลาดในการอัพเดทข้อมูลผู้ใช้: {e}")
 
-    def update_medication_info(self):
+
+    def show_medication_loading(self):
+        """(ฟังก์ชันใหม่) แสดงสถานะกำลังโหลดในกรอบข้อมูลยา"""
         try:
             # ลบข้อมูลเก่า
             for label in self.medication_labels:
                 label.destroy()
             self.medication_labels.clear()
 
-            # ดึงข้อมูลการตั้งค่ายาจาก API
+            # แสดงการ์ด "กำลังโหลด"
+            loading_card = ctk.CTkFrame(
+                self.medication_list_frame,
+                height=80, corner_radius=10, fg_color="#FFF3CD",
+                border_width=1, border_color="#FFE69C"
+            )
+            loading_card.pack(pady=30, padx=10, fill="x")
+            
+            loading_label = ctk.CTkLabel(
+                loading_card, text="🔄 กำลังโหลดข้อมูลการตั้งค่ายา...",
+                font=("TH Sarabun New", 18, "bold"), text_color="#856404",
+                fg_color="transparent"
+            )
+            loading_label.pack(pady=20)
+            
+            self.medication_labels.extend([loading_card, loading_label])
+        except Exception as e:
+            print(f"Error in show_medication_loading: {e}")
+
+    def update_medication_info(self):
+      
+        try:
+            # 1. แสดง "กำลังโหลด..." บน UI ทันที
+            self.show_medication_loading()
+            
+            # 2. สร้างและเริ่ม Thread ใหม่ให้ไปทำงานเบื้องหลัง
+            threading.Thread(
+                target=self._fetch_medication_data_in_background, 
+                daemon=True
+            ).start()
+            
+        except Exception as e:
+            print(f"เกิดข้อผิดพลาดในการเริ่ม update_medication_info: {e}")
+            self.show_medication_error() # (ใช้ฟังก์ชันเดิมของคุณ)
+
+    def _fetch_medication_data_in_background(self):
+       
+        print("Background Thread: กำลังเริ่มดึงข้อมูล get_meal...")
+        try:
             if hasattr(self.controller, 'user') and self.controller.user:
+                
+                # --- 1. นี่คือจุดที่ "Blocking" (ใช้เวลานาน) ---
                 meal_data = set_dispensing_time.get_meal(
                     self.controller.user['device_id'],
                     self.controller.user['id']
                 )
+                # --- จบการ Blocking ---
+
+                # --- 2. เรียก recivetime ทันทีที่ได้ข้อมูล ---
+                if meal_data and 'data' in meal_data:
+                    recivetime(meal_data['data']) # <--- เรียกใช้ recivetime ที่นี่
                 
-                # แสดงข้อมูลวันที่เริ่มและสิ้นสุด
-                if hasattr(self.controller, 'user') and self.controller.user:
-                    start_date = self.controller.user.get('startDate', '')
-                    end_date = self.controller.user.get('endDate', '')
-                    
-                    if start_date and end_date:
-                        try:
-                            start_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
-                            end_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
-                            
-                            start_str = start_dt.strftime("%d/%m/%Y")
-                            end_str = end_dt.strftime("%d/%m/%Y")
-                            
-                            date_info = f"ระยะเวลา: {start_str} - {end_str}"
-                            
-                            date_card = ctk.CTkFrame(
-                                self.medication_list_frame,
-                                height=40,
-                                corner_radius=8,
-                                fg_color="#D4EDDA",
-                                border_width=1,
-                                border_color="#C3E6CB"
+                print("Background Thread: ดึงข้อมูลสำเร็จ, กำลังส่งไปอัปเดต UI...")
+                # 3. เมื่อได้ข้อมูลแล้ว ให้ส่งผลลัพธ์กลับไปทำใน Main Thread
+                self.after(0, self._render_medication_data, meal_data, None)
+            
+            else:
+                print("Background Thread: ไม่พบข้อมูลผู้ใช้")
+                self.after(0, self._render_medication_data, None, "No user data")
+
+        except Exception as e:
+            print(f"Background Thread: เกิดข้อผิดพลาดขณะดึงข้อมูล API: {e}")
+            # 4. หาก Error ให้ส่ง Error กลับไป Main Thread
+            self.after(0, self._render_medication_data, None, str(e))
+
+    def _render_medication_data(self, meal_data, error_message):
+
+        # print("Main Thread: กำลังอัปเดต UI ด้วยข้อมูลยา...")
+        try:
+            # 1. ลบ "กำลังโหลด..." หรือข้อมูลเก่าทิ้ง
+            for label in self.medication_labels:
+                label.destroy()
+            self.medication_labels.clear()
+
+            # 2. ตรวจสอบว่ามี Error มาจาก Thread หรือไม่
+            if error_message:
+                print(f"Error rendering data: {error_message}")
+                self.show_medication_error() # (ใช้ฟังก์ชันเดิมของคุณ)
+                return
+
+            # --- (โค้ดส่วนที่เหลือคือโค้ด "วาด UI" เดิมของคุณทั้งหมด) ---
+            
+            # 3. แสดงข้อมูลวันที่เริ่มและสิ้นสุด
+            if hasattr(self.controller, 'user') and self.controller.user:
+                start_date = self.controller.user.get('startDate', '')
+                end_date = self.controller.user.get('endDate', '')
+                
+                if start_date and end_date:
+                    try:
+                        start_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+                        end_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
+                        
+                        start_str = start_dt.strftime("%d/%m/%Y")
+                        end_str = end_dt.strftime("%d/%m/%Y")
+                        
+                        date_info = f"ระยะเวลา: {start_str} - {end_str}"
+                        
+                        date_card = ctk.CTkFrame(
+                            self.medication_list_frame,
+                            height=40, corner_radius=8, fg_color="#D4EDDA",
+                            border_width=1, border_color="#C3E6CB"
+                        )
+                        date_card.pack(pady=2, padx=5, fill="x")
+                        
+                        date_label = ctk.CTkLabel(
+                            date_card, text=date_info,
+                            font=("TH Sarabun New", 18, "bold"), text_color="#155724",
+                            fg_color="transparent"
+                        )
+                        date_label.place(x=10, y=6)
+                        
+                        self.medication_labels.extend([date_card, date_label])
+                    except Exception as e_date:
+                        print(f"Error formatting date: {e_date}")
+                        pass # (ถ้า format วันที่ผิด ก็แค่ข้ามไป)
+
+            # 4. แสดงข้อมูลยา (ที่ได้มาจาก meal_data)
+            if meal_data and 'data' in meal_data:
+                medications = meal_data['data']
+                # recivetime(medications)  <--- (ย้ายไป Thread เบื้องหลังแล้ว)
+                
+                if medications:
+                    # แสดงข้อมูลยาในรูปแบบการ์ด
+                    for i, med in enumerate(medications):
+                        meal_names = {
+                            'bb': ' ก่อนนอน', 'bf': ' เช้า',
+                            'lunch': ' กลางวัน', 'dn': ' เย็น'
+                        }
+                        meal_name = meal_names.get(med.get('source', ''), med.get('source', ''))
+                        time_str = med.get('time', '')
+                        
+                        med_count = 0
+                        med_names = []
+                        for j in range(1, 5):
+                            med_name_item = med.get(f'medicine_{j}', '')
+                            if med_name_item:
+                                med_count += 1
+                                med_names.append(med_name_item)
+                        
+                        if med_count > 0:
+                            # สร้างการ์ดยา
+                            med_card = ctk.CTkFrame(
+                                self.medication_list_frame, height=60, corner_radius=10,
+                                fg_color="#E8F6EF", border_width=2, border_color="#7EBCA2"
                             )
-                            date_card.pack(pady=2, padx=5, fill="x")
+                            med_card.pack(pady=3, padx=5, fill="x")
                             
-                            date_label = ctk.CTkLabel(
-                                date_card,
-                                text=date_info,
-                                font=("TH Sarabun New", 18, "bold"),
-                                text_color="#155724",
+                            time_label = ctk.CTkLabel(
+                                med_card, text=f"{meal_name} - {time_str}",
+                                font=("TH Sarabun New", 20, "bold"), text_color="#2D6A4F",
                                 fg_color="transparent"
                             )
-                            date_label.place(x=10, y=6)
+                            time_label.place(x=10, y=5)
                             
-                            self.medication_labels.extend([date_card, date_label])
-                        except:
-                            pass
-                
-                if meal_data and 'data' in meal_data:
-                    medications = meal_data['data']
-                    recivetime(medications)
-                    if medications:
-                        # แสดงข้อมูลยาในรูปแบบการ์ด
-                        for i, med in enumerate(medications):
-                            meal_names = {
-                                'bb': ' ก่อนนอน',
-                                'bf': ' เช้า',
-                                'lunch': ' กลางวัน',
-                                'dn': ' เย็น'
-                            }
+                            count_label = ctk.CTkLabel(
+                                med_card, text=f" {med_count} รายการ",
+                                font=("TH Sarabun New", 20), text_color="#495057",
+                                fg_color="transparent"
+                            )
+                            count_label.place(x=10, y=28)
                             
-                            meal_name = meal_names.get(med.get('source', ''), med.get('source', ''))
-                            time_str = med.get('time', '')
+                            status_label = ctk.CTkLabel(
+                                med_card, text=" พร้อมใช้",
+                                font=("TH Sarabun New", 20, "bold"), text_color="#FF0000",
+                                fg_color="transparent"
+                            )
+                            status_label.place(x=200, y=28)
                             
-                            # นับจำนวนยา
-                            med_count = 0
-                            med_names = []
-                            for j in range(1, 5):
-                                med_name = med.get(f'medicine_{j}', '')
-                                if med_name:
-                                    med_count += 1
-                                    med_names.append(med_name)
-                            
-                            if med_count > 0:
-                                # สร้างการ์ดยา
-                                med_card = ctk.CTkFrame(
-                                    self.medication_list_frame,
-                                    height=60,
-                                    corner_radius=10,
-                                    fg_color="#E8F6EF",
-                                    border_width=2,
-                                    border_color="#7EBCA2"
-                                )
-                                med_card.pack(pady=3, padx=5, fill="x")
-                                
-                                # เวลาและมื้อ
-                                time_label = ctk.CTkLabel(
-                                    med_card,
-                                    text=f"{meal_name} - {time_str}",
-                                    font=("TH Sarabun New", 20, "bold"),
-                                    text_color="#2D6A4F",
-                                    fg_color="transparent"
-                                )
-                                time_label.place(x=10, y=5)
-                                
-                                # จำนวนยา
-                                count_label = ctk.CTkLabel(
-                                    med_card,
-                                    text=f" {med_count} รายการ",
-                                    font=("TH Sarabun New", 20),
-                                    text_color="#495057",
-                                    fg_color="transparent"
-                                )
-                                count_label.place(x=10, y=28)
-                                
-                                # สถานะ
-                                status_label = ctk.CTkLabel(
-                                    med_card,
-                                    text=" พร้อมใช้",
-                                    font=("TH Sarabun New", 20, "bold"),
-                                    text_color="#FF0000",
-                                    fg_color="transparent"
-                                )
-                                status_label.place(x=200, y=28)
-                                
-                                self.medication_labels.extend([med_card, time_label, count_label, status_label])
-                    else:
-                        # แสดงข้อความเมื่อไม่มีข้อมูลยา
-                        self.show_no_medication_message()
+                            self.medication_labels.extend([med_card, time_label, count_label, status_label])
                 else:
-                    # แสดงข้อความเมื่อไม่มีข้อมูลยา
                     self.show_no_medication_message()
-                    
-        except Exception as e:
-            print(f"เกิดข้อผิดพลาดในการอัพเดทข้อมูลยา: {e}")
+            else:
+                self.show_no_medication_message()
+                
+        except Exception as e_render:
+            print(f"เกิดข้อผิดพลาดในการ *แสดงผล* ข้อมูลยา: {e_render}")
             self.show_medication_error()
-
+    
     def update_datetime(self):
         """อัพเดทวันที่และเวลาพร้อมเอฟเฟ็กต์"""
         today = datetime.today()
@@ -3260,81 +3327,6 @@ class Report2(ctk.CTkFrame):
                     label.grid(row=i+1, column=col, padx=3, pady=3)
                     
                     
-                    
-# class Report3(ctk.CTkFrame):
-#     def __init__(self, parent, controller):
-#         super().__init__(parent)
-#         self.controller = controller
-
-#         # พื้นหลัง
-#         bg_image = Image.open("imgNew/pagereport1.png").resize((1920, 1080), Image.Resampling.LANCZOS)
-#         bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1920, 1080))
-#         bg_label = ctk.CTkLabel(self, image=bg_ctk_image, text="")
-#         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
-
-#         # กรอบข้อมูล
-#         info_frame = ctk.CTkFrame(self, fg_color="#e0e0e0", corner_radius=20)
-#         info_frame.place(relx=0.5, rely=0.3, anchor="center")
-
-#         # หัวข้อ "ข้อมูลผู้ป่วย" อยู่ในกรอบและตรงกลางบนสุด
-#         header = ctk.CTkLabel(info_frame, text="ข้อมูลผู้ป่วย", font=("TH Sarabun New", 36, "bold"), text_color="black")
-#         header.grid(row=0, column=0, columnspan=4, pady=(20, 10), sticky="n")
-
-#         # ข้อมูลฝั่งซ้าย
-#         left_data = [
-#             ("ชื่อจริง:", "-"),
-#             ("วัน / เดือน / ปี:", "-"),
-#             ("ที่อยู่:", "-"),
-#             ("โรคประจำตัว:", "-")
-#         ]
-
-#         # ข้อมูลฝั่งขวา
-#         right_data = [
-#             ("นามสกุล:", "-"),
-#             ("เพศ:", "-")
-#         ]
-
-#         # แสดงข้อมูลฝั่งซ้าย (เริ่ม row=1)
-#         for i, (label, value) in enumerate(left_data):
-#             ctk.CTkLabel(info_frame, text=label, font=("TH Sarabun New", 28, "bold"),
-#                          text_color="black", anchor="w", width=200).grid(row=i+1, column=0, padx=20, pady=10, sticky="w")
-#             ctk.CTkLabel(info_frame, text=value, font=("TH Sarabun New", 28),
-#                          text_color="black", anchor="w", width=300).grid(row=i+1, column=1, padx=10, pady=10, sticky="w")
-
-#         # แสดงข้อมูลฝั่งขวา (เริ่ม row=1 เช่นกัน เพื่อให้เทียบกับฝั่งซ้าย)
-#         for i, (label, value) in enumerate(right_data):
-#             ctk.CTkLabel(info_frame, text=label, font=("TH Sarabun New", 28, "bold"),
-#                          text_color="black", anchor="w", width=200).grid(row=i+1, column=2, padx=40, pady=10, sticky="w")
-#             ctk.CTkLabel(info_frame, text=value, font=("TH Sarabun New", 28),
-#                          text_color="black", anchor="w", width=300).grid(row=i+1, column=3, padx=10, pady=10, sticky="w")
-
-#         # Navbar ด้านล่าง
-#         navbar = ctk.CTkFrame(self, height=200, fg_color="#A8DADC")
-#         navbar.pack(side="bottom", fill="x")
-
-#         page_title = ctk.CTkLabel(
-#             navbar,
-#             text="ข้อมูลผู้ใช้งาน",
-#             font=("Arial", 50, "bold"),
-#             text_color="black"
-#         )
-#         page_title.pack(side="left", padx=20, pady=20)
-
-#         back_button = ctk.CTkButton(
-#             navbar,
-#             text="←",
-#             width=150,
-#             height=100,
-#             corner_radius=35,
-#             fg_color=force_color,
-#             hover_color="#FF0000",
-#             text_color="white",
-#             font=("Arial", 44, "bold"),
-#             command=lambda: controller.show_frame(HomePage)
-#         )
-#         back_button.pack(side="right", padx=10, pady=20)
-
-
 class Wificonnect(ctk.CTkFrame):
     def on_show(self):
         print("Wificonnect is now visible")
@@ -3695,7 +3687,12 @@ class MainApp(ctk.CTk):
         super().__init__()
         self.user = None
         self.title("เครื่องโฮมแคร์อัจฉริยะควบคุมผ่านระบบ SeniorCare Pro")
-        
+        #  loop Data api
+        self.polling_thread_active = False
+        self.polling_thread_handle = None
+        self.data_lock = threading.Lock()
+        self.last_known_schedule_data = None 
+        self.data_lock = threading.Lock()
         # ปรับขนาดหน้าจอเป็น 1024x600
         self.geometry("1024x800")
         
@@ -3718,7 +3715,7 @@ class MainApp(ctk.CTk):
         self.device_status_var = ctk.StringVar(value="0")
 
         self.device_status_var.trace_add('write', self.status_callback)
-
+        self.status_timestamps = {}
 
         # สร้าง container frame
         self.container = ctk.CTkFrame(self)
@@ -3743,6 +3740,60 @@ class MainApp(ctk.CTk):
         self.load_user_data()
         self.start_serial_thread()
     
+
+    def start_background_polling(self):
+        if not self.polling_thread_active:
+           print("--- [MainApp] Starting background polling thread... ---")
+           self.polling_thread_active = True
+           self.polling_thread_handle = threading.Thread(
+                target=self._polling_loop, 
+                daemon=True
+            ) 
+           self.polling_thread_handle.start()
+        else:
+            print("--- [MainApp] Polling thread is already running. ---")
+
+    def stop_background_polling(self):
+        print("--- [MainApp] Received stop signal. ---")
+        self.polling_thread_active = False 
+        self.user = None                  
+        self.last_known_schedule_data = None 
+        self.polling_thread_handle = None
+
+    def _polling_loop(self):
+        
+        while self.polling_thread_active:
+
+            if not self.user:
+                print("ไม่พบข้อมูลผู้ใช้งาน")
+                time.sleep(5)
+                continue
+
+            try:
+                new_data = set_dispensing_time.get_meal(
+                    self.user['device_id'],
+                    self.user['id']
+                )
+
+                if new_data and 'data' in new_data:
+                    recivetime(new_data['data'])
+                data_changed = False
+
+                with self.data_lock:
+                    if new_data and new_data != self.last_known_schedule_data:
+                        self.last_known_schedule_data = new_data
+                        data_changed = True
+
+                if data_changed:
+                    current_frame = self.frames[HomePage]    
+                    if current_frame.winfo_viewable():
+                        self.after(0, current_frame._render_medication_data, new_data, None)
+            except Exception as e:
+                print(f"[Polling Thread] Error during API poll: {e}")
+
+            time.sleep(30)
+
+
     def start_serial_thread(self):
         try:
             # กำหนด Port และ Baudrate
@@ -3766,16 +3817,31 @@ class MainApp(ctk.CTk):
     # อัพเดตสถานะการจ่ายยา
     def status_callback(self,*args):
         new_status = self.device_status_var.get()
+        current_time = time.time()
 
-        if new_status == 1:
-            print("Action: HELLO")
+
+        if new_status == "1":
+
+            if '0' in self.status_timestamps['0']:
+                time_state = self.status_timestamps['0']
+                duration = current_time -time_state
+
+                duration_minutes = duration /60
+            
+            if duration_minutes > self.user['alert_delay']:
+                print(f"!!! test !!! (Duration {duration:.0f}s > {self.alert_delay}s)")
+            else:
+                print(f"--- ทดสอบ --- (Duration {duration:.0f}s <= {self.alert_delay}s)")
+
             homePage = self.frames[HomePage]
             homePage.reduce_medicine()
         else:
             print("Action: OK")
 
     def load_user_data(self):
+
         """โหลดข้อมูลผู้ใช้จากไฟล์"""
+
         if os.path.exists("user_data.json"):
             try:
                 with open("user_data.json", "r", encoding='utf-8') as f:
@@ -3799,7 +3865,7 @@ class MainApp(ctk.CTk):
         try:
             frame = self.frames[frame_class]
             frame.lift()
-            
+
             # เรียก on_show method หากมี
             if hasattr(frame, 'on_show'):
                 frame.on_show()
@@ -3833,6 +3899,8 @@ class MainApp(ctk.CTk):
         y = (self.winfo_screenheight() // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
     
+
+   
     def on_closing(self):
         """จัดการเมื่อปิดแอปพลิเคชัน"""
         try:
