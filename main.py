@@ -14,6 +14,7 @@ from babel.dates import format_date
 # model format เวลา
 from lib.set_time import default_serializer
 from lib.serial_handler import recivetime,start_Serial_loop
+from notifier import Notifier
 
 # --ใหม่--
 #import pywinstyles
@@ -343,30 +344,33 @@ class login(ctk.CTkFrame):
             
             def login_thread():
                 try:
-                    result = auth.login(self.username.get(), self.password.get())             
-                    print(result)             
-                    if result['status']:                 
-                        self.controller.user = result['user']                 
-                        with open('user_data.json', 'w', encoding='utf-8') as f:                     
-                            json.dump(result['user'], f, ensure_ascii=False, indent=4, default=default_serializer)                 
-                        print(result['message'])                 
-                        # เปลี่ยนจาก show_frame ระหว่างกำลังโหลด -> ให้ hide_loading พาไปยังหน้าเป้าหมาย
+                    result = auth.login(self.username.get(), self.password.get())
+                    
+                    if result['status']:
+                        self.controller.user = result['user']
+                        with open('user_data.json', 'w', encoding='utf-8') as f:
+                            json.dump(result['user'], f, ensure_ascii=False, indent=4, default=default_serializer)
+
+                        self.controller.notifier.show_notification(result['message'], success=True)
+
+                        # เปลี่ยนหน้าเมื่อเข้าสู่ระบบสำเร็จ
                         def go_wifi():
                             try:
                                 controller._previous_frame_class = Wificonnect
                             except Exception:
                                 pass
                             controller.hide_loading()
+
                         controller.after(0, go_wifi)
-                    else:                 
-                        print(result['message'])
+                    else:
+                        self.controller.notifier.show_notification(result['message'], success=False)
                         controller.after(0, controller.hide_loading)
                 except Exception as e:
-                    print(f"เกิดข้อผิดพลาด: {e}")
+                    self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
                     controller.after(0, controller.hide_loading)
-            
-            threading.Thread(target=login_thread, daemon=True).start()          
-        
+
+            threading.Thread(target=login_thread, daemon=True).start()
+
         # === ปุ่มเข้าสู่ระบบ (Get Started Button) ===
         save_button = ctk.CTkButton(             
             frame,             
@@ -1352,31 +1356,34 @@ class Frame2(ctk.CTkFrame):
                 )
                 if medicine_data['status']:
                     self.medications = medicine_data['Data']
-                    print(self.medications)
+                    self.controller.notifier.show_notification("โหลดข้อมูลยาสำเร็จ", success=True)
                 else:
                     self.medications = []
-                    print(medicine_data['message'])
-                
+                    self.controller.notifier.show_notification(medicine_data['message'], success=False)
+
                 # อัปเดต UI และซ่อนหน้าดาวโหลด
                 self.controller.after(0, self.refresh_medications)
                 self.controller.after(0, self.controller.hide_loading)
             except Exception as e:
-                print(f"เกิดข้อผิดพลาด: {e}")
+                self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
                 self.controller.after(0, self.controller.hide_loading)
-        
+
         threading.Thread(target=load_medications_thread, daemon=True).start()
 
+
     def delete_medication(self, medicine_id):
-        print(medicine_id)
         confirm = messagebox.askyesno("ยืนยัน", "คุณต้องการลบยานี้หรือไม่?")
         if confirm:
             delete_medic = manageMedic.DeleteMedic(medicine_id)
             if delete_medic['status']:
-                self.medications = [med for med in self.medications if med['medicine_id'] != medicine_id]
-                messagebox.showinfo("สำเร็จ", delete_medic['message'])
+                self.medications = [
+                    med for med in self.medications if med['medicine_id'] != medicine_id
+                ]
+                self.controller.notifier.show_notification(delete_medic['message'], success=True)
             else:
-                messagebox.showerror("ล้มเหลว", delete_medic['message'])
+                self.controller.notifier.show_notification(delete_medic['message'], success=False)
             self.refresh_medications()
+
 
     def refresh_medications(self):
         for widget in self.sub_frame.winfo_children():
@@ -1792,19 +1799,26 @@ class Frame4(ctk.CTkFrame):
             
             def save_advice_thread():
                 try:
-                    ai_advice = ai.save_advice(self.controller.user['id'], self.systolic_var.get(), self.diastolic_var.get(), self.pulse_var.get())
+                    ai_advice = ai.save_advice(
+                        self.controller.user['id'],
+                        self.systolic_var.get(),
+                        self.diastolic_var.get(),
+                        self.pulse_var.get()
+                    )
                     if ai_advice['status']:
                         self.controller.advice = ai_advice['Advice']
                         sendtoTelegram(ai_advice['Advice'], self.controller.user['telegram_key'], self.controller.user['telegram_id'])
+                        self.controller.notifier.show_notification("บันทึกคำแนะนำสำเร็จ", success=True)
                         controller.after(0, lambda: controller.show_frame(AIgen))
                     else:
-                        print(ai_advice['message'])
+                        self.controller.notifier.show_notification(ai_advice['message'], success=False)
                         controller.after(0, controller.hide_loading)
                 except Exception as e:
-                    print(f"เกิดข้อผิดพลาด: {e}")
+                    self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
                     controller.after(0, controller.hide_loading)
-            
+
             threading.Thread(target=save_advice_thread, daemon=True).start()
+
             
         save_button = ctk.CTkButton(frame, text="บันทึกและกลับสู่หน้าหลัก", width=300, height=70, fg_color=force_color, 
                                     text_color="white", font=("Arial", 24, "bold"), command=save_and_go_home)
@@ -2024,15 +2038,15 @@ class add_Frame(ctk.CTkFrame):
                 if med_name and med_name != first_med:
                     new_meds.append(med_name)
 
-            if not len(new_meds) == 0:
+            if len(new_meds) != 0:
                 insert_new_medic = manageMedic.insertMedic(
                     self.controller.user['id'],
                     self.controller.user['device_id'],
                     new_meds
                 )
-                print(insert_new_medic['message'])
+                self.controller.notifier.show_notification(insert_new_medic['message'], success=insert_new_medic['status'])
             else:
-                print('ไม่พบข้อมูลยาใหม่กรุณากรอกข้อมูลยาก่อนกดบันทึก')
+                self.controller.notifier.show_notification("กรุณากรอกชื่อยาก่อนบันทึก", success=False)
 
             go_back()
 
@@ -2342,27 +2356,29 @@ class MedicationApp(ctk.CTkFrame):
         
         def update_meal_config_thread():
             try:
-                #logic ฝั่ง server
-                medicine_data = manageMedic.getMedicine(self.controller.user['id'],self.controller.user['device_id'])
-                if medicine_data['status']: 
+                medicine_data = manageMedic.getMedicine(
+                    self.controller.user['id'], self.controller.user['device_id']
+                )
+                if medicine_data['status']:
                     self.medicine_map = {
-                                        med["medicine_name"]: med["medicine_id"]
-                                        for med in medicine_data["Data"]
-                                        }
+                        med["medicine_name"]: med["medicine_id"]
+                        for med in medicine_data["Data"]
+                    }
                     with open("meal_config.json", "r") as f:
                         meal_config = json.load(f)
                         self.num_meals = int(meal_config["meals"].split()[0])
                     
-                    # อัปเดต UI และซ่อนหน้าดาวโหลด
+                    self.controller.notifier.show_notification("โหลดข้อมูลมื้ออาหารสำเร็จ", success=True)
                     self.controller.after(0, self.process_meal_config_update)
-                else :
-                    print(medicine_data['message'])
+                else:
+                    self.controller.notifier.show_notification(medicine_data['message'], success=False)
                     self.controller.after(0, self.controller.hide_loading)
             except Exception as e:
-                print(f"เกิดข้อผิดพลาด: {e}")
+                self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
                 self.controller.after(0, self.controller.hide_loading)
-        
+
         threading.Thread(target=update_meal_config_thread, daemon=True).start()
+
     
     def process_meal_config_update(self):
         """ประมวลผลการอัปเดต meal config หลังจากโหลดเสร็จ"""
@@ -2620,19 +2636,13 @@ class MedicationApp(ctk.CTkFrame):
     def save_and_go_to_frame1(self):
         meal_data = {}
         
-        # ใช้ entry_frames เป็นหลักในการวนลูป
         for meal_name, entry_frame in self.entry_frames.items():
-            # ตรวจสอบว่ามีข้อมูลเวลาหรือไม่
             if meal_name not in self.time_entries or meal_name not in self.time_selects:
                 continue
                 
-            # ดึงค่าจริงจาก ComboBox ช่วงเวลา
             time_period = self.time_selects[meal_name].get()
-            
-            # ดึงค่าเวลาจริง
             time_value = self.time_entries[meal_name].get()
             
-            # รวบรวม ID ยา
             med_ids = []
             if meal_name in self.med_combos:
                 for med_combo in self.med_combos[meal_name]:
@@ -2640,30 +2650,33 @@ class MedicationApp(ctk.CTkFrame):
                     if med_name in self.medicine_map and med_name != "เลือกยา":
                         med_ids.append(self.medicine_map[med_name])
             
-            # บันทึกข้อมูลโดยใช้ช่วงเวลาจริงที่ผู้ใช้เลือก
             meal_data[time_period] = {
                 "time": time_value if time_value else "00:00",
                 "medications": med_ids
             }
-   
-        print("บันทึกข้อมูลสำเร็จ! ข้อมูลที่บันทึก:", meal_data)
+
         all_selected_periods = []
         for page_idx, selections in self.selected_time_periods.items():
             all_selected_periods.extend(selections.values())
-        
-        # ตรวจสอบว่ามีค่าซ้ำกันหรือไม่ (ไม่นับค่าว่าง)
+
         selected_periods = [p for p in all_selected_periods if p and p != "เลือกช่วงเวลา"]
         if len(selected_periods) != len(set(selected_periods)):
-            # มีการเลือกซ้ำกัน
-            messagebox.showerror("ข้อผิดพลาด", "มีการเลือกช่วงเวลาซ้ำกัน กรุณาตรวจสอบอีกครั้ง")
+            self.controller.notifier.show_notification("มีช่วงเวลาซ้ำกัน กรุณาตรวจสอบอีกครั้ง", success=False)
             return
-        insert_meal = set_dispensing_time.set_meal(self.controller.user['device_id'],self.controller.user['id'],meal_data)
-        if( insert_meal['status']):
-            print(insert_meal['message'])
+
+        insert_meal = set_dispensing_time.set_meal(
+            self.controller.user['device_id'],
+            self.controller.user['id'],
+            meal_data
+        )
+        
+        if insert_meal['status']:
+            self.controller.notifier.show_notification(insert_meal['message'], success=True)
             self.controller.show_frame(HomePage)
             meal_data.clear()
         else:
-            print(insert_meal['message'])
+            self.controller.notifier.show_notification(insert_meal['message'], success=False)
+
         
     def on_show(self):
         print("MedicationApp is now visible")
@@ -2856,11 +2869,13 @@ class info(ctk.CTkFrame):
                 self.entry_telegram_id.get(),
                 self.entry_telegram_group.get()
             )
+
             if success['status']:
-                print(success['message'])
+                self.controller.notifier.show_notification(success['message'], success=True)
                 controller.show_frame(HomePage)
             else:
-                print(success['message'])
+                self.controller.notifier.show_notification(success['message'], success=False)
+
 
         btn_save = ctk.CTkButton(form_frame, text="บันทึกข้อมูล", command=save_data,
                                  fg_color="green", text_color="white",
@@ -3029,20 +3044,21 @@ class MedicationScheduleFrame(ctk.CTkFrame):
         back_button.pack(side="right", padx=10, pady=10)
         
         def save_and_go_to_frame1():
-            if(date_entry.get() == "" and end_entry.get() == ""):
-                print('กรุณากำหนดวันที่เริ่มจ่ายยา')
+            if date_entry.get() == "" and end_entry.get() == "":
+                self.controller.notifier.show_notification("กรุณากำหนดวันที่เริ่มจ่ายยา", success=False)
                 return
 
             setting_time = set_dispensing_time.set_time(
                 self.controller.user['device_id'],
                 date_entry.get(), end_entry.get()
             )
+
             if setting_time['status']:
-                print(setting_time['message'])
+                self.controller.notifier.show_notification(setting_time['message'], success=True)
                 controller.show_frame(MedicationApp)
             else:
-                print(setting_time['message'])
-        
+                self.controller.notifier.show_notification(setting_time['message'], success=False)
+
         # ปุ่มบันทึกแบบ Premium
         save_button = ctk.CTkButton(
             navbar, text="บันทึก", corner_radius=20, width=100, height=50, 
@@ -3418,22 +3434,26 @@ class Report1(ctk.CTkFrame):
             try:
                 self.result = manageData.get(self.userid)
                 result = medicine_report.get_eatmedic(self.userid)
-                
+
                 if result['status']:
                     self.data = result['data']
                     self.page = 1
-                    # อัปเดต UI
+                    self.controller.notifier.show_notification("โหลดรายงานสำเร็จ", success=True)
+
                     self.controller.after(0, lambda: self.display_table())
-                    self.controller.after(0, lambda: self.export_button.configure(command=lambda: generate_pdf_sync(self.userid,)))
+                    self.controller.after(0, lambda: self.export_button.configure(
+                        command=lambda: generate_pdf_sync(self.userid,)
+                    ))
                     self.controller.after(0, self.controller.hide_loading)
                 else:
-                    print(result['message'])
+                    self.controller.notifier.show_notification(result['message'], success=False)
                     self.controller.after(0, self.controller.hide_loading)
             except Exception as e:
-                print(f"เกิดข้อผิดพลาด: {e}")
+                self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
                 self.controller.after(0, self.controller.hide_loading)
-        
+
         threading.Thread(target=load_report_data_thread, daemon=True).start()
+
 
     def display_table(self):
         # เคลียร์ widget เก่าใน scrollable_frame แทน table_frame
@@ -3643,19 +3663,24 @@ class Report2(ctk.CTkFrame):
             result = heart_report().generate_advice(self.controller.user['id'])
             if result['status']:
                 heart_info_json = json.dumps(result['data'], ensure_ascii=False)
-                prompt = f"นี่คือรายงานค่าความดันสูง ความดันต่ำ และค่าชีพจรในแต่ละวัน มีข้อมูลตามนี้: {heart_info_json} ช่วยประเมินโรคที่อาจเกิดขึ้นและให้คำแนะนำในการดูแลตัวเองและการปรับพฤติกรรมที่เหมาะสม"
+                prompt = (
+                    f"นี่คือรายงานค่าความดันสูง ความดันต่ำ และค่าชีพจรในแต่ละวัน "
+                    f"มีข้อมูลตามนี้: {heart_info_json} "
+                    f"ช่วยประเมินโรคที่อาจเกิดขึ้นและให้คำแนะนำในการดูแลตัวเองและการปรับพฤติกรรมที่เหมาะสม"
+                )
 
                 gemini = Gemini()
                 ai_text = gemini.Advice(prompt)
 
-                # ✅ อัปเดต Textbox แสดง AI
+                self.controller.notifier.show_notification("โหลดข้อมูลสุขภาพสำเร็จ", success=True)
                 self.after(0, lambda: self.update_ui(result, ai_text))
             else:
-                print("เกิดข้อผิดพลาด:", result['message'])
+                self.controller.notifier.show_notification(result['message'], success=False)
                 self.controller.after(0, self.controller.hide_loading)
         except Exception as e:
-            print(f"เกิดข้อผิดพลาด: {e}")
+            self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
             self.controller.after(0, self.controller.hide_loading)
+
     
     def update_ui(self, result, ai_text):
         # อัปเดต AI textbox
@@ -4166,7 +4191,7 @@ class MainApp(ctk.CTk):
         self.data_lock = threading.Lock()
         # ปรับขนาดหน้าจอเป็น 1024x600
         self.geometry("1024x800")
-        
+        self.notifier = Notifier(self)
         # ปรับการตั้งค่าหน้าต่างสำหรับจอเล็ก
         self.resizable(False, False)  # ป้องกันการปรับขนาด
         
