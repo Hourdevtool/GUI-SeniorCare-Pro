@@ -38,6 +38,7 @@ from server.heart_report import heart_report
 from server.eat_medicine_report import eat_medicine_report
 from server.exportpdf import generate_pdf_sync
 from server.setcounter import SetCounter
+from server.device_status import Devicestatus
 auth = auth()
 manageData = infoData()
 manageMedic = manageMedicData()
@@ -46,6 +47,7 @@ ai = Gemini()
 set_counter = SetCounter()
 Heart_report = heart_report()
 medicine_report = eat_medicine_report()
+device_status = Devicestatus()
 # -----------------------------------------------------
 
 # ------------------ Loading Screen------------------------

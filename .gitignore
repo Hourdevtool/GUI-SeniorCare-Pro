@@ -2,5 +2,6 @@
 /lib/__pycache__
 /user_data.json
 /*Database
+/*__pycache__
 .env
 
