@@ -1330,7 +1330,7 @@ class HomePage(ctk.CTkFrame):
         if current_status == "offline":
           
             print("HomePage: Network is OFFLINE, disabling buttons.")
-            skip = [1,3,5,6]
+            skip = [1,5,6]
             for i, btn in self.menu_buttons.items():
                 
                 if i in skip : 
