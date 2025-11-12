@@ -4261,19 +4261,19 @@ class MainApp(ctk.CTk):
         self.load_user_data()
         self.start_serial_thread()
 
-        if hasattr(self, 'user') and isinstance(self.user, dict) and 'device_id' in self.user:
-            device_id_to_monitor = self.user.get('device_id')
+        if hasattr(self, 'user') and isinstance(self.user, dict) and 'id' in self.user:
+            id_to_monitor = self.user.get('id')
             
-            if device_id_to_monitor:
+            if id_to_monitor:
                 self.network_monitor = NetworkMonitor(
-                    device_id=device_id_to_monitor, 
+                    id=id_to_monitor, 
                     ui_callback=self._async_update_wifi_status, # ใช้ฟังก์ชันที่เราเพิ่งสร้าง
-                    monitor_interval=60
+                    monitor_interval=10
                 )
                 self.network_monitor.start()
-                print(f"✅ Started Network Monitor for Device ID: {device_id_to_monitor}")
+                print(f"✅ Started Network Monitor for Device ID: {id_to_monitor}")
             else:
-                 print("❌ Cannot start Network Monitor: 'device_id' not found in self.user.")
+                 print("❌ Cannot start Network Monitor: 'id' not found in self.user.")
         else:
             print("⚠️ self.user not defined or loaded yet. Network Monitor not started.")
         # ---------------------------------------------------
