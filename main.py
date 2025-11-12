@@ -17,6 +17,7 @@ from lib.serial_handler import recivetime,start_Serial_loop
 from notifier import Notifier
 from network_monitor import NetworkMonitor
 import serial
+import requests
 # --ใหม่--
 #import pywinstyles
 
@@ -399,7 +400,8 @@ class HomePage(ctk.CTkFrame):
         # อัพเดทข้อมูลการตั้งค่ายาเมื่อแสดงหน้า
         self.update_medication_info()
         self.controller.start_background_polling()
-        
+        self.controller.fetch_medications(show_loading_screen=False, on_complete_callback=None)
+
         if self.controller.last_known_schedule_data:
             print("Data found in MainApp cache, rendering immediately.")
             # ถ้ามี, ใช้วาด UI ทันที
@@ -411,10 +413,17 @@ class HomePage(ctk.CTkFrame):
         # อัพเดทข้อมูลผู้ใช้เมื่อแสดงหน้า
         self.update_user_info()
         self.create_menu_buttons(self.controller)
+
+        self.check_network_and_update_buttons()
        
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
+
+        self.menu_buttons = {}
+        self.button_original_styles = {}
+        self._last_checked_network_status = None
+
         # พื้นหลัง (ปรับขนาดเป็น 1024x600)
         bg_image = Image.open(f"{PATH}image/home.png").resize((1024, 800), Image.Resampling.LANCZOS)
         self.bg_photo = ImageTk.PhotoImage(bg_image)
@@ -459,6 +468,9 @@ class HomePage(ctk.CTkFrame):
 
     def create_menu_buttons(self, controller):
         # ปรับขนาดปุ่มให้เล็กลง
+        self.menu_buttons.clear()
+        self.button_original_styles.clear()
+
         btn_size = (100, 100)
         btn_images = {}
         pressure = 0
@@ -520,6 +532,13 @@ class HomePage(ctk.CTkFrame):
                     command = self.shutdown_system
                 else:
                     command = lambda i=i: controller.show_frame(pages[i])
+                
+                style = {
+                    'fg_color': "#FFFFFF",
+                    'hover_color': "#E9ECEF",
+                    'text_color': "#1D3557",
+                    'border_color': "#A8DADC"
+                }
 
                 # สร้างปุ่ม
                 btn = ctk.CTkButton(
@@ -540,7 +559,8 @@ class HomePage(ctk.CTkFrame):
                     command=command
                 )
                 btn.place(x=x_pos, y=y_pos)
-                #pywinstyles.set_opacity(btn, value=1,color="#000001")
+                self.menu_buttons[i] = btn
+                self.button_original_styles[i] = style
 
     def confirm_logout(self):
         response = messagebox.askyesno("ยืนยันออกจากระบบ", "คุณต้องการออกจากระบบหรือไม่?")
@@ -975,34 +995,82 @@ class HomePage(ctk.CTkFrame):
             self.show_medication_error() # (ใช้ฟังก์ชันเดิมของคุณ)
 
     def _fetch_medication_data_in_background(self):
-       
-        print("Background Thread: กำลังเริ่มดึงข้อมูล get_meal...")
+        CACHE_FILE = "time_data.json" # ⭐️ ชื่อไฟล์แคช
+        meal_data = None
+        error_message = None
+
         try:
-            if hasattr(self.controller, 'user') and self.controller.user:
-                
-                # --- 1. นี่คือจุดที่ "Blocking" (ใช้เวลานาน) ---
-                meal_data = set_dispensing_time.get_meal(
+         
+            if not (hasattr(self.controller, 'user') and self.controller.user):
+                print("Background Thread: ไม่พบข้อมูลผู้ใช้")
+                self.after(0, self._render_medication_data, None, "No user data")
+                return
+
+         
+            network_status = self.controller.network_status_var.get()
+
+            if network_status == "online":
+                print("Background Thread (HomePage): Online. กำลังดึงข้อมูลจากเซิร์ฟเวอร์...")
+                meal_api_result = set_dispensing_time.get_meal(
                     self.controller.user['device_id'],
                     self.controller.user['id']
                 )
-                # --- จบการ Blocking ---
-
-                # --- 2. เรียก recivetime ทันทีที่ได้ข้อมูล ---
-                if meal_data and 'data' in meal_data:
-                    recivetime(meal_data['data']) # <--- เรียกใช้ recivetime ที่นี่
                 
-                print("Background Thread: ดึงข้อมูลสำเร็จ, กำลังส่งไปอัปเดต UI...")
-                # 3. เมื่อได้ข้อมูลแล้ว ให้ส่งผลลัพธ์กลับไปทำใน Main Thread
-                self.after(0, self._render_medication_data, meal_data, None)
-            
-            else:
-                print("Background Thread: ไม่พบข้อมูลผู้ใช้")
-                self.after(0, self._render_medication_data, None, "No user data")
+                if meal_api_result and 'data' in meal_api_result:
+                    meal_data = meal_api_result 
+                    data_to_cache = meal_api_result['data'] 
+                    try:
+                        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+                            json.dump(data_to_cache, f, indent=4)
+                        print(f"Background Thread (HomePage): บันทึกข้อมูลใหม่ลง {CACHE_FILE} สำเร็จ")
+                    except Exception as e:
+                        print(f"Background Thread (HomePage): ไม่สามารถเขียนไฟล์แคช: {e}")
+                        
+                else:
+                 
+                    print("Background Thread (HomePage): เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง")
+                    error_message = "ข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง"
 
+            else:
+             
+                print("Background Thread (HomePage): Offline. กำลังโหลดจากแคช...")
+                error_message = "Offline"
+
+        except requests.exceptions.RequestException as e:
+         
+            print(f"Background Thread (HomePage): เกิดข้อผิดพลาด Network: {e}")
+            error_message = str(e) 
         except Exception as e:
-            print(f"Background Thread: เกิดข้อผิดพลาดขณะดึงข้อมูล API: {e}")
-            # 4. หาก Error ให้ส่ง Error กลับไป Main Thread
+ 
+            print(f"Background Thread (HomePage): เกิดข้อผิดพลาดร้ายแรง: {e}")
             self.after(0, self._render_medication_data, None, str(e))
+            return
+
+        
+        if meal_data:
+            print("Background Thread (HomePage): ดึงข้อมูลสำเร็จ กำลังแสดงผล...")
+            if 'data' in meal_data:
+                 recivetime(meal_data['data']) 
+            self.after(0, self._render_medication_data, meal_data, None)
+        
+        elif error_message:
+            print(f"Background Thread (HomePage): ดึงข้อมูลล้มเหลว ({error_message}). กำลังโหลดจากแคช...")
+            if os.path.exists(CACHE_FILE):
+                try:
+                    with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                        cached_data_list = json.load(f) 
+                    
+                    meal_data = {'data': cached_data_list} 
+                    
+                    print("Background Thread (HomePage): โหลดแคชสำเร็จ กำลังแสดงผล...")
+                    recivetime(meal_data['data']) 
+                    self.after(0, self._render_medication_data, meal_data, None) 
+                except Exception as e:
+                    print(f"Background Thread (HomePage): ไม่สามารถอ่านไฟล์แคช: {e}")
+                    self.after(0, self._render_medication_data, None, f"Offline และอ่านไฟล์แคชไม่ได้: {e}")
+            else:
+                print("Background Thread (HomePage): ไม่พบไฟล์แคช")
+                self.after(0, self._render_medication_data, None, "Offline และไม่พบข้อมูลที่บันทึกไว้")
 
     def _render_medication_data(self, meal_data, error_message):
 
@@ -1158,6 +1226,7 @@ class HomePage(ctk.CTkFrame):
         # อัพเดทสถานะระบบ
         self.update_system_status()
         
+        self.check_network_and_update_buttons()
         # เรียกฟังก์ชันนี้ใหม่ทุก 1 วินาที (ตรวจสอบว่าหน้าต่างยังอยู่)
         try:
             if self.winfo_exists():
@@ -1230,16 +1299,72 @@ class HomePage(ctk.CTkFrame):
         error_label.pack(pady=20)
         
         self.medication_labels.extend([error_card, error_label])
+    def check_network_and_update_buttons(self):
+        """
+        ตรวจสอบสถานะเน็ตจาก 'global' (controller) และ
+        อัปเดตสถานะปุ่ม (เทา/กดไม่ได้)
+        """
+        current_status = "online" # ค่าเริ่มต้น
+        try:
+            # 1. พยายามอ่านจาก ctk.StringVar (วิธีที่แนะนำ)
+            current_status = self.controller.network_status_var.get()
+        except AttributeError:
+            try:
+                # 2. ถ้าไม่สำเร็จ ลองอ่านจากตัวแปร String ธรรมดา
+                current_status = self.controller.network_status
+            except AttributeError:
+                # 3. ถ้ายังไม่ถูกสร้าง (เช่น app เพิ่งเปิด) ให้ข้ามไปก่อน
+                # print("Network status variable not yet initialized.")
+                return 
+        except Exception as e:
+            # print(f"Error reading network status: {e}")
+            return
+
+
+        if current_status == self._last_checked_network_status:
+            return # ถ้าสถานะเดิม ไม่ต้องทำอะไร
+        
+        
+        self._last_checked_network_status = current_status
+
+        if current_status == "offline":
+          
+            print("HomePage: Network is OFFLINE, disabling buttons.")
+            skip = [1,3,5,6]
+            for i, btn in self.menu_buttons.items():
+                
+                if i in skip : 
+                    continue 
+                
+                btn.configure(
+                    state="disabled",
+                    fg_color="#E0E0E0",      # สีเทา
+                    hover_color="#E0E0E0",     # สีเทา
+                    text_color="#9E9E9E",    # สีเทา
+                    border_color="#BDBDBD"   # สีเทา
+                )
+        else:
+            # --- เน็ตออนไลน์: คืนค่าปุ่มเป็นปกติ ---
+            print("HomePage: Network is ONLINE, enabling buttons.")
+            for i, btn in self.menu_buttons.items():
+                if i in self.button_original_styles:
+                    style = self.button_original_styles[i]
+                    btn.configure(
+                        state="normal",
+                        fg_color=style['fg_color'],
+                        hover_color=style['hover_color'],
+                        text_color=style['text_color'],
+                        border_color=style['border_color']
+                    )
 class Frame2(ctk.CTkFrame): 
     def on_show(self):
         print("Frame2 is now visible")
         self.load_medications()
-        self.refresh_medications()
 
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-        self.medications = []
+
         self.configure(bg_color="#8dc5fc")
 
         # Background
@@ -1349,42 +1474,41 @@ class Frame2(ctk.CTkFrame):
         print("การแจ้งเตือน กำลังสลับไปยังหน้า Frame2-add.py")
 
     def load_medications(self):
-        # แสดงหน้าดาวโหลด
-        self.controller.show_loading("กำลังโหลดข้อมูลยา...", "กรุณารอสักครู่")
-        
-        def load_medications_thread():
-            try:
-                medicine_data = manageMedic.getMedicine(
-                    self.controller.user['id'], self.controller.user['device_id']
-                )
-                if medicine_data['status']:
-                    self.medications = medicine_data['Data']
-                    self.controller.notifier.show_notification("โหลดข้อมูลยาสำเร็จ", success=True)
-                else:
-                    self.medications = []
-                    self.controller.notifier.show_notification(medicine_data['message'], success=False)
 
-                # อัปเดต UI และซ่อนหน้าดาวโหลด
-                self.controller.after(0, self.refresh_medications)
-                self.controller.after(0, self.controller.hide_loading)
-            except Exception as e:
-                self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
-                self.controller.after(0, self.controller.hide_loading)
-
-        threading.Thread(target=load_medications_thread, daemon=True).start()
-
+      self.controller.fetch_medications(
+            show_loading_screen=True,
+            on_complete_callback=self.refresh_medications
+        )
 
     def delete_medication(self, medicine_id):
         confirm = messagebox.askyesno("ยืนยัน", "คุณต้องการลบยานี้หรือไม่?")
         if confirm:
-            delete_medic = manageMedic.DeleteMedic(medicine_id)
-            if delete_medic['status']:
-                self.medications = [
-                    med for med in self.medications if med['medicine_id'] != medicine_id
-                ]
-                self.controller.notifier.show_notification(delete_medic['message'], success=True)
-            else:
-                self.controller.notifier.show_notification(delete_medic['message'], success=False)
+            if self.controller.network_status_var.get() == "offline":
+                self.controller.notifier.show_notification("ไม่สามารถลบขณะออฟไลน์", success=False)
+                return
+            
+            try:
+                delete_medic = manageMedic.DeleteMedic(medicine_id)
+                if delete_medic['status']:
+                    
+                    with self.controller.medicine_data_lock:
+                        self.controller.cached_medications = [
+                            med for med in self.controller.cached_medications if med['medicine_id'] != medicine_id
+                        ]
+                    
+                    try:
+                        with open(self.controller.MEDICINE_CACHE_FILE, "w", encoding="utf-8") as f:
+                            json.dump(self.controller.cached_medications, f, indent=4)
+                    except Exception as e:
+                        print(f"Failed to update cache file after delete: {e}")
+
+                    self.controller.notifier.show_notification(delete_medic['message'], success=True)
+                else:
+                    self.controller.notifier.show_notification(delete_medic['message'], success=False)
+            
+            except Exception as e:
+                 self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
+
             self.refresh_medications()
 
 
@@ -1392,7 +1516,8 @@ class Frame2(ctk.CTkFrame):
         for widget in self.sub_frame.winfo_children():
             widget.destroy()
 
-        if not self.medications:
+        meds_to_display = self.controller.cached_medications
+        if not meds_to_display:
             no_data_label = ctk.CTkLabel(
                 self.sub_frame,
                 text="ไม่มีข้อมูล",
@@ -1403,7 +1528,7 @@ class Frame2(ctk.CTkFrame):
             no_data_label.pack(pady=10, fill="x")
             return
 
-        for index, med in enumerate(self.medications):
+        for index, med in enumerate(meds_to_display):
             medicine_id = med['medicine_id']
             medicine_name = med['medicine_name']
 
@@ -2284,6 +2409,8 @@ class TimeNumpad(ctk.CTkToplevel):
 
 
 
+# ⭐️ [แทนที่] คลาส MedicationApp ทั้งหมดด้วยโค้ดนี้ ⭐️
+
 class MedicationApp(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -2307,7 +2434,7 @@ class MedicationApp(ctk.CTkFrame):
             text="กำหนดช่วงเวลาและยา",
             font=("TH Sarabun New", 28, "bold"),
             text_color="black"
-        )  
+        )   
         
         self.page_title.pack(side="left", padx=20)
         self.reply_ctk_image = ctk.CTkImage(
@@ -2318,7 +2445,7 @@ class MedicationApp(ctk.CTkFrame):
         self.back_button = ctk.CTkButton(
             self.navbar,
            image=self.reply_ctk_image,   # ใช้ image แทน text
-            text="ย้อนกลับ",                      # ไม่ใส่ข้อความ
+            text="ย้อนกลับ",                # ไม่ใส่ข้อความ
             width=100, 
             height=50, 
             corner_radius=25,
@@ -2336,7 +2463,10 @@ class MedicationApp(ctk.CTkFrame):
             fg_color="#2D6A4F", text_color="white", hover_color="#1B4332",
             font=("Arial", 24, "bold"), 
             border_width=2, border_color="#1B4332", command=self.save_and_go_to_frame1)
-        self.back_button.pack(side="right", padx=10, pady=10)
+        
+        # ⭐️ [แก้ไข] ปุ่ม save_button ควร pack หลังจาก back_button
+        # (โค้ดเดิมของคุณ pack back_button สองครั้ง)
+        self.save_button.pack(side="right", padx=10, pady=10) 
 
         self.time_options = ["เช้า", "กลางวัน", "เย็น", "ก่อนนอน"]
 
@@ -2347,7 +2477,6 @@ class MedicationApp(ctk.CTkFrame):
         )
         parent_frame.place(relx=0.5, rely=0.5, anchor="center")
         parent_frame.pack_propagate(False)  # กันไม่ให้ขนาดเปลี่ยนตามลูก
-        #pywinstyles.set_opacity(parent_frame, value=0.9,color="#000001")
         
         # === Scrollable Frame ข้างใน ===
         self.frame_container = ctk.CTkScrollableFrame(
@@ -2360,53 +2489,97 @@ class MedicationApp(ctk.CTkFrame):
         self.pages = []
         self.time_entries = {}    # เก็บเวลาของแต่ละมื้อ
         self.time_selects = {}    # เก็บช่วงเวลาของแต่ละมื้อ
-        self.med_entries = {"เช้า": [], "กลางวัน": [], "เย็น": [], "ก่อนนอน": []}  # เก็บข้อมูลยาแต่ละมื้อ
+        self.med_entries = {"เช้า": [], "กลางวัน": [], "เย็น": [], "ก่อนนอน": []}   # เก็บข้อมูลยาแต่ละมื้อ
         self.med_combos = {}      # เก็บ reference ของ combobox ยา
         self.entry_frames = {}
 
+    
+    # ⭐️ [FIX 1] เพิ่มฟังก์ชันนี้ที่ขาดไป (ที่ on_show เรียก) ⭐️
     def update_meal_config(self):
-        # แสดงหน้าดาวโหลด
+        """
+        ฟังก์ชันนี้ถูกเรียกโดย on_show เพื่อเริ่มโหลดข้อมูลยา
+        """
+        # (เราจำเป็นต้องแสดง Loading ที่นี่)
         self.controller.show_loading("กำลังโหลดข้อมูลยา...", "กรุณารอสักครู่")
         
-        def update_meal_config_thread():
-            try:
-                medicine_data = manageMedic.getMedicine(
+        # เริ่ม Thread (ที่คุณสร้างไว้แล้ว)
+        threading.Thread(target=self.update_meal_config_thread, daemon=True).start()
+
+        
+    def update_meal_config_thread(self):
+        try:
+            # 1. ตรวจสอบสถานะเน็ต
+            network_status = self.controller.network_status_var.get()
+            medicine_data = None
+            
+            if network_status == "online":
+                # 2a. ถ้าออนไลน์: ดึงข้อมูลใหม่จาก Server
+                print("Meds (App): Online - Fetching from server...")
+                api_result = manageMedic.getMedicine(
                     self.controller.user['id'], self.controller.user['device_id']
                 )
-                if medicine_data['status']:
-                    self.medicine_map = {
-                        med["medicine_name"]: med["medicine_id"]
-                        for med in medicine_data["Data"]
-                    }
-                    with open("meal_config.json", "r") as f:
-                        meal_config = json.load(f)
-                        self.num_meals = int(meal_config["meals"].split()[0])
-                    
-                    self.controller.notifier.show_notification("โหลดข้อมูลมื้ออาหารสำเร็จ", success=True)
-                    self.controller.after(0, self.process_meal_config_update)
+                if api_result['status']:
+                    medicine_data = api_result['Data']
+                    # บันทึกข้อมูลใหม่ลงแคช
+                    with open(self.controller.MEDICINE_CACHE_FILE, "w", encoding="utf-8") as f:
+                        json.dump(medicine_data, f, indent=4)
                 else:
-                    self.controller.notifier.show_notification(medicine_data['message'], success=False)
-                    self.controller.after(0, self.controller.hide_loading)
-            except Exception as e:
-                self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
+                    self.controller.notifier.show_notification(api_result['message'], success=False)
+
+            else:
+                # 2b. ถ้าออฟไลน์: โหลดจากไฟล์แคช
+                print(f"Meds (App): Offline - Loading from {self.controller.MEDICINE_CACHE_FILE}")
+                if os.path.exists(self.controller.MEDICINE_CACHE_FILE):
+                    try:
+                        with open(self.controller.MEDICINE_CACHE_FILE, "r", encoding="utf-8") as f:
+                            medicine_data = json.load(f)
+                    except Exception as e:
+                        print(f"Meds (App): Error reading cache file: {e}")
+                        self.controller.notifier.show_notification("Offline: ไม่สามารถอ่านไฟล์แคชยา", success=False)
+                else:
+                    self.controller.notifier.show_notification("Offline: ไม่พบข้อมูลยาที่บันทึกไว้", success=False)
+
+            # 3. ประมวลผลข้อมูล (ไม่ว่าจะมาจาก online หรือ offline)
+            if medicine_data is not None:
+                self.medicine_map = {
+                    med["medicine_name"]: med["medicine_id"]
+                    for med in medicine_data
+                }
+                with open("meal_config.json", "r") as f:
+                    meal_config = json.load(f)
+                    self.num_meals = int(meal_config["meals"].split()[0])
+                
+                self.controller.notifier.show_notification("โหลดข้อมูลยาสำเร็จ", success=True)
+                self.controller.after(0, self.process_meal_config_update)
+            else:
+                # ถ้าไม่สำเร็จ (เช่น offline + ไม่มีแคช)
+                self.controller.notifier.show_notification("ไม่สามารถโหลดข้อมูลยาได้", success=False)
                 self.controller.after(0, self.controller.hide_loading)
 
-        threading.Thread(target=update_meal_config_thread, daemon=True).start()
+        except Exception as e:
+            self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
+            self.controller.after(0, self.controller.hide_loading)
 
     
+    # ⭐️ [FIX 2 & 3] แก้ไขฟังก์ชันนี้ (ล้าง UI) และจัดย่อหน้า ⭐️
     def process_meal_config_update(self):
         """ประมวลผลการอัปเดต meal config หลังจากโหลดเสร็จ"""
         try:
-            self.selected_time_periods = {}
-            for i in range(len(self.pages)):
-                self.selected_time_periods[i] = {}
+            # 1. ทำลาย Widgets เก่าทั้งหมดใน frame_container ⭐️
+            for widget in self.frame_container.winfo_children():
+                widget.destroy()
 
+            # 2. ล้างค่าทั้งหมด และรีเซ็ต Page ⭐️
+            self.pages.clear()
+            self.current_page = 0
+            
+            self.selected_time_periods = {}
             self.time_entries = {}
             self.time_selects = {}
             self.med_entries = {"เช้า": [], "กลางวัน": [], "เย็น": [], "ก่อนนอน": []}
             self.med_combos = {}
             self.entry_frames = {}
-            self.selected_time_periods = {}
+            # ----------------------------------------------------
 
             for i in range(0, self.num_meals, 2):
                 page = ctk.CTkFrame(self.frame_container, fg_color=back_color, bg_color=back_color)
@@ -2417,8 +2590,8 @@ class MedicationApp(ctk.CTkFrame):
             if self.num_meals > 2:
                 if not hasattr(self, 'next_button'):
                     self.next_button = ctk.CTkButton(self.navbar, text="ถัดไป", corner_radius=20, width=100, height=50, 
-                                                    fg_color=force_color, text_color="white", hover_color="#002299",
-                                                    font=("Arial", 24, "bold"),  command=self.next_page)
+                                                     fg_color=force_color, text_color="white", hover_color="#002299",
+                                                     font=("Arial", 24, "bold"),  command=self.next_page)
                 self.next_button.pack(side="right", padx=10, pady=10)
             else:
                 if hasattr(self, 'next_button'):
@@ -2432,8 +2605,8 @@ class MedicationApp(ctk.CTkFrame):
 
         if not hasattr(self, 'back_button'):
             self.back_button2 = ctk.CTkButton(self.navbar, text="ย้อนกลับ",  corner_radius=20, width=100, height=50, 
-                                            fg_color=force_color, text_color="white", hover_color="#002299",
-                                            font=("Arial", 24, "bold"),  command=lambda: self.controller.show_frame(MedicationApp))
+                                               fg_color=force_color, text_color="white", hover_color="#002299",
+                                               font=("Arial", 24, "bold"),  command=lambda: self.controller.show_frame(MedicationApp))
             self.back_button2.pack(side="right", padx=10, pady=10)
 
     def show_page(self, page_index):
@@ -2441,7 +2614,7 @@ class MedicationApp(ctk.CTkFrame):
             widget.pack_forget()
 
         self.pages[page_index].pack(fill="both", expand=True)
-      
+    
         if page_index == 1 and hasattr(self, 'next_button'):
             self.next_button.pack_forget()
         elif page_index == 0 and hasattr(self, 'next_button'):
@@ -2465,7 +2638,7 @@ class MedicationApp(ctk.CTkFrame):
 
         self.pages[page_index].pack(fill="both", expand=True)
 
-        for i in range(page_index * 2, min((page_index + 1) * 2, self.num_meals)):        
+        for i in range(page_index * 2, min((page_index + 1) * 2, self.num_meals)):      
             meal_name = self.time_options[i]
 
             meal_label = ctk.CTkLabel(
@@ -2560,6 +2733,7 @@ class MedicationApp(ctk.CTkFrame):
         delete_button.grid(row=0, column=1, sticky="w")
 
         self.med_entries[meal].append((row, med_combo, delete_button))
+        
     def on_time_period_select(self, page_index, column_index, selected_value, meal_name):
         """เมื่อผู้ใช้เลือกช่วงเวลา"""
         # บันทึกค่าที่เลือก
@@ -2618,7 +2792,7 @@ class MedicationApp(ctk.CTkFrame):
             
         if meal in self.med_combos and med_combo in self.med_combos[meal]:
                     self.med_combos[meal].remove(med_combo)
-        row.destroy()      
+        row.destroy()     
 
     def format_time(self, time_var):
         text = time_var.get().replace(":", "")
@@ -2648,15 +2822,24 @@ class MedicationApp(ctk.CTkFrame):
         self.controller.show_frame(MedicationScheduleFrame)
 
     def save_and_go_to_frame1(self):
+       
         meal_data = {}
-        
         for meal_name, entry_frame in self.entry_frames.items():
             if meal_name not in self.time_entries or meal_name not in self.time_selects:
                 continue
-                
+            
             time_period = self.time_selects[meal_name].get()
             time_value = self.time_entries[meal_name].get()
             
+          
+            if time_period == "เลือกช่วงเวลา" and (time_value or (meal_name in self.med_combos and self.med_combos[meal_name])):
+                 self.controller.notifier.show_notification(f"กรุณาเลือกช่วงเวลาสำหรับ {meal_name}", success=False)
+                 return
+
+
+            if time_period == "เลือกช่วงเวลา":
+                continue
+
             med_ids = []
             if meal_name in self.med_combos:
                 for med_combo in self.med_combos[meal_name]:
@@ -2668,7 +2851,7 @@ class MedicationApp(ctk.CTkFrame):
                 "time": time_value if time_value else "00:00",
                 "medications": med_ids
             }
-
+        
         all_selected_periods = []
         for page_idx, selections in self.selected_time_periods.items():
             all_selected_periods.extend(selections.values())
@@ -2677,25 +2860,131 @@ class MedicationApp(ctk.CTkFrame):
         if len(selected_periods) != len(set(selected_periods)):
             self.controller.notifier.show_notification("มีช่วงเวลาซ้ำกัน กรุณาตรวจสอบอีกครั้ง", success=False)
             return
+       
+        network_status = self.controller.network_status_var.get()
+        QUEUE_FILE = "offline_schedule_queue.json" 
 
-        insert_meal = set_dispensing_time.set_meal(
-            self.controller.user['device_id'],
-            self.controller.user['id'],
-            meal_data
-        )
-        
-        if insert_meal['status']:
-            self.controller.notifier.show_notification(insert_meal['message'], success=True)
-            self.controller.show_frame(HomePage)
-            meal_data.clear()
+        if network_status == "online":
+
+            print("Meds (App): Online - Sending meal data to server...")
+            try:
+                insert_meal = set_dispensing_time.set_meal(
+                    self.controller.user['device_id'],
+                    self.controller.user['id'],
+                    meal_data
+                )
+                
+                if insert_meal['status']:
+                    self.controller.notifier.show_notification(insert_meal['message'], success=True)
+                    self.update_local_time_data_cache(meal_data)
+                    self.controller.show_frame(HomePage)
+                else:
+                    self.controller.notifier.show_notification(insert_meal['message'], success=False)
+            
+            except requests.exceptions.RequestException as e:
+                print(f"Meds (App): Failed to send data (Server Error/Timeout): {e}")
+                self.save_meal_to_queue_and_cache(QUEUE_FILE, meal_data)
+                self.controller.notifier.show_notification("เซิร์ฟเวอร์ขัดข้อง: บันทึกข้อมูลไว้ในเครื่อง", success=False)
+                self.controller.show_frame(HomePage) 
+
         else:
-            self.controller.notifier.show_notification(insert_meal['message'], success=False)
+            print("Meds (App): Offline - Saving meal data to local queue and cache...")
+            try:
+                self.save_meal_to_queue_and_cache(QUEUE_FILE, meal_data)
+                self.controller.notifier.show_notification("Offline: บันทึกข้อมูลตั้งค่าเวลาไว้ในเครื่อง", success=True)
+                self.controller.show_frame(HomePage)
+            except Exception as e:
+                self.controller.notifier.show_notification(f"ผิดพลาด: บันทึกไฟล์ไม่สำเร็จ: {e}", success=False)
 
+
+
+    def save_meal_to_queue_and_cache(self, queue_file, meal_data):
+
+        new_task = {
+            "type": "set_meal", 
+            "payload": {
+                "device_id": self.controller.user['device_id'],
+                "user_id": self.controller.user['id'],
+                "meal_data": meal_data 
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+
+        queue = []
+        if os.path.exists(queue_file):
+            try:
+                with open(queue_file, "r", encoding="utf-8") as f:
+                    queue = json.load(f)
+                if not isinstance(queue, list): queue = []
+            except json.JSONDecodeError:
+                queue = []
         
+        queue.append(new_task)
+        try:
+            with open(queue_file, "w", encoding="utf-8") as f:
+                json.dump(queue, f, indent=4)
+            print(f"Task 'set_meal' successfully added to {queue_file}")
+        except Exception as e:
+            print(f"Error writing to {queue_file}: {e}")
+            raise 
+        self.update_local_time_data_cache(meal_data)
+
+    def update_local_time_data_cache(self, meal_data):
+        """
+        แปลงข้อมูล meal_data (dict) ให้อยู่ในรูปแบบ list (ที่ HomePage ใช้อ่าน)
+        แล้วบันทึกลง "time_data.json"
+        """
+        CACHE_FILE = "time_data.json"
+        
+        # Maps (จำเป็นสำหรับการแปลง)
+        meal_key_map = {
+            'เช้า': 'bf',
+            'กลางวัน': 'lunch',
+            'เย็น': 'dn',
+            'ก่อนนอน': 'bb'
+        }
+        # สร้าง map กลับด้าน (ID -> Name) จาก self.medicine_map ที่โหลดมาตอน on_show
+        if not hasattr(self, 'medicine_map'):
+             print("Error: medicine_map is missing. Cannot update cache.")
+             return
+
+        reverse_medicine_map = {v: k for k, v in self.medicine_map.items()}
+
+        new_cache_data = [] # นี่คือ list ที่จะบันทึกลง time_data.json
+        
+        for meal_name_th, data in meal_data.items():
+            if meal_name_th not in meal_key_map:
+                continue # ข้ามถ้าเป็น "เลือกช่วงเวลา"
+            
+            # สร้าง object meal
+            meal_entry = {
+                "source": meal_key_map.get(meal_name_th), # "เช้า" -> "bf"
+                "time": data.get("time", "00:00"),
+                "medicine_1": None,
+                "medicine_2": None,
+                "medicine_3": None,
+                "medicine_4": None
+            }
+            
+            # แปลง med_ids กลับเป็นชื่อ
+            med_ids = data.get("medications", [])
+            for i, med_id in enumerate(med_ids):
+                if i < 4: # รองรับสูงสุด 4 ยา
+                    med_name = reverse_medicine_map.get(med_id, "Unknown")
+                    meal_entry[f"medicine_{i+1}"] = med_name
+            
+            new_cache_data.append(meal_entry)
+        
+        # 3. เขียนทับไฟล์ time_data.json
+        try:
+            with open(CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump(new_cache_data, f, indent=4)
+            print(f"Meds (App): Updated {CACHE_FILE} cache successfully.")
+        except Exception as e:
+            print(f"Meds (App): Failed to write {CACHE_FILE}: {e}")        
     def on_show(self):
         print("MedicationApp is now visible")
         self.update_meal_config()
-
 class info(ctk.CTkFrame):
     def on_show(self):
         print("info is now visible")
@@ -2907,6 +3196,7 @@ class info(ctk.CTkFrame):
 
 
 
+
 class MedicationScheduleFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, width=1024, height=600, corner_radius=0, fg_color="#1d567b")
@@ -3066,22 +3356,71 @@ class MedicationScheduleFrame(ctk.CTkFrame):
         back_button.pack(side="right", padx=10, pady=10)
         
         def save_and_go_to_frame1():
-            if date_entry.get() == "" and end_entry.get() == "":
+            
+            # --- (1) Get data from entries ---
+            start_date = date_entry.get()
+            end_date = end_entry.get()
+            device_id = self.controller.user['device_id']
+
+            # --- (2) Validation (same as before) ---
+            if start_date == "" and end_date == "":
                 self.controller.notifier.show_notification("กรุณากำหนดวันที่เริ่มจ่ายยา", success=False)
                 return
 
-            setting_time = set_dispensing_time.set_time(
-                self.controller.user['device_id'],
-                date_entry.get(), end_entry.get()
-            )
+            # --- (3) Get Network Status ---
+            network_status = "offline" # ค่าเริ่มต้น
+            try:
+                # พยายามอ่านจาก ctk.StringVar (วิธีที่แนะนำ)
+                network_status = self.controller.network_status_var.get()
+            except AttributeError:
+                try:
+                    # ถ้าไม่สำเร็จ ลองอ่านจากตัวแปรธรรมดา
+                    network_status = self.controller.network_status
+                except AttributeError:
+                    print("Warning: ไม่สามารถอ่านสถานะเน็ตจาก controller ได้")
 
-            if setting_time['status']:
-                self.controller.notifier.show_notification(setting_time['message'], success=True)
-                controller.show_frame(MedicationApp)
+            # ⭐️ ชื่อไฟล์สำหรับเก็บคิวงานออฟไลน์
+            QUEUE_FILE = "offline_schedule_queue.json"
+
+            if network_status == "online":
+                # --- 4a. ONLINE: พยายามส่งข้อมูลไปเซิร์ฟเวอร์ ---
+                print("Network is Online. Sending data to server...")
+                try:
+                    setting_time = set_dispensing_time.set_time(
+                        device_id,
+                        start_date, 
+                        end_date
+                    )
+                    
+                    if setting_time['status']:
+                        self.controller.notifier.show_notification(setting_time['message'], success=True)
+                        controller.show_frame(MedicationApp) # ไปหน้าถัดไป
+                    else:
+                        self.controller.notifier.show_notification(setting_time['message'], success=False)
+                        # ไม่ต้องไปหน้าถัดไปถ้าเซิร์ฟเวอร์ปฏิเสธ
+
+                except requests.exceptions.RequestException as e: 
+                    # ⭐️ ถ้า "ออนไลน์" แต่เซิร์ฟเวอร์ล่ม (เช่น 500 error หรือ ConnectTimeout)
+                    print(f"Failed to send data (Server Error/Timeout): {e}")
+                    # ให้บันทึกลงคิวออฟไลน์แทน
+                    self.save_schedule_to_queue(QUEUE_FILE, device_id, start_date, end_date)
+                    self.controller.notifier.show_notification("เซิร์ฟเวอร์ขัดข้อง: บันทึกข้อมูลไว้ในเครื่อง", success=False)
+                    controller.show_frame(MedicationApp) # ยังคงไปหน้าถัดไป
+
             else:
-                self.controller.notifier.show_notification(setting_time['message'], success=False)
-
-        # ปุ่มบันทึกแบบ Premium
+                # --- 4b. OFFLINE: บันทึกลงไฟล์ JSON Queue ---
+                print("Network is Offline. Saving data to local queue...")
+                try:
+                    self.save_schedule_to_queue(QUEUE_FILE, device_id, start_date, end_date)
+                    
+                    # แจ้งเตือนผู้ใช้และไปหน้าถัดไป
+                    self.controller.notifier.show_notification("Offline: บันทึกข้อมูลไว้ในเครื่อง", success=True)
+                    controller.show_frame(MedicationApp)
+                    
+                except Exception as e:
+                    self.controller.notifier.show_notification(f"ผิดพลาด: บันทึกไฟล์ไม่สำเร็จ: {e}", success=False)
+                    print(f"Failed to save offline data: {e}")
+        
         save_button = ctk.CTkButton(
             navbar, text="บันทึก", corner_radius=20, width=100, height=50, 
             fg_color="#2D6A4F", text_color="white", hover_color="#1B4332",
@@ -3092,8 +3431,7 @@ class MedicationScheduleFrame(ctk.CTkFrame):
         save_button.pack(side="right", padx=10, pady=10)
 
 
-
-        
+       
         date_picker_open = [False]
         def open_date_picker():
             if not date_picker_open[0]:
@@ -3144,11 +3482,42 @@ class MedicationScheduleFrame(ctk.CTkFrame):
 
         except Exception as e:
             print(f"Error loading meal_config.json: {e}")
+    def save_schedule_to_queue(self, queue_file, device_id, start_date, end_date):
+            new_task = {
+                "type": "set_time", # ระบุประเภทของงาน
+                "payload": {
+                    "device_id": device_id,
+                    "start_date": start_date,
+                    "end_date": end_date
+                },
+                "timestamp": datetime.now().isoformat() # เก็บเวลาที่บันทึก
+            }
 
+           
+            queue = []
+            if os.path.exists(queue_file):
+                try:
+                    with open(queue_file, "r", encoding="utf-8") as f:
+                        queue = json.load(f)
+                        if not isinstance(queue, list): # กันไฟล์เสีย
+                            queue = []
+                except json.JSONDecodeError:
+                    queue = [] 
+            
+           
+            queue.append(new_task)
+            
+            try:
+                with open(queue_file, "w", encoding="utf-8") as f:
+                    json.dump(queue, f, indent=4)
+                print(f"Task successfully added to {queue_file}")
+            except Exception as e:
+                print(f"Error writing to {queue_file}: {e}")
+                raise # ส่ง exception กลับไปให้ฟังก์ชันหลัก
+        
     def on_show(self):
         print("MedicationScheduleFrame is now visible")
         self.load_meal_config()
-
 
 
 class DatePicker(ctk.CTkFrame):
@@ -4211,6 +4580,7 @@ class MainApp(ctk.CTk):
         self.data_lock = threading.Lock()
         self.last_known_schedule_data = None 
         self.data_lock = threading.Lock()
+
         # ปรับขนาดหน้าจอเป็น 1024x600
         self.geometry("1024x800")
         self.notifier = Notifier(self)
@@ -4239,9 +4609,14 @@ class MainApp(ctk.CTk):
         self.container = ctk.CTkFrame(self)
         self.container.pack(fill="both", expand=True)
         
+        self.network_status_var = ctk.StringVar(value="offline")
         # สร้างและจัดการ frames ต่างๆ
         self.frames = {}
-        
+
+        self.cached_medications = [] 
+        self.medicine_data_lock = threading.Lock() 
+        self.MEDICINE_CACHE_FILE = "offline_medicineData.json"
+        self._is_med_cache_loading = False
         # รายการ frames ที่จะสร้าง
         frame_classes = (
             HomePage, Frame2, Frame3, Frame4, add_Frame, info, 
@@ -4277,7 +4652,118 @@ class MainApp(ctk.CTk):
         else:
             print("⚠️ self.user not defined or loaded yet. Network Monitor not started.")
         # ---------------------------------------------------
+
+
+    def fetch_medications(self, show_loading_screen=True, on_complete_callback=None):
+        """
+        ฟังก์ชัน Global สำหรับโหลด/แคชข้อมูลยา
+        - show_loading_screen: True = แสดงหน้าโหลด (สำหรับ Frame2)
+        - show_loading_screen: False = โหลดเงียบๆ (สำหรับ HomePage)
+        - on_complete_callback: ฟังก์ชันที่จะรันเมื่อเสร็จ (เช่น Frame2.refresh_medications)
+        """
         
+        # ⭐️⭐️ นี่คือส่วนที่ "กัน error" ที่คุณต้องการ ⭐️⭐️
+        if not self.user:
+            print("Meds: ไม่สามารถโหลดได้, ยังไม่ได้ล็อกอิน")
+            # (ถ้า Frame2 เรียกตอนยังไม่ล็อกอิน) ให้ซ่อน loading และแสดงผลว่า "ไม่มีข้อมูล"
+            if show_loading_screen:
+                self.hide_loading()
+            if on_complete_callback:
+                self.after(0, on_complete_callback) 
+            return # ⭐️ หยุดการทำงานทันที ⭐️
+        # ----------------------------------------------------
+
+        # ⭐️ ป้องกันการโหลดซ้ำซ้อน ถ้ากำลังโหลดอยู่
+        if self._is_med_cache_loading:
+            print("Meds: กำลังโหลดข้อมูลยาอยู่แล้ว, ข้ามคำสั่งนี้")
+            return
+            
+        self._is_med_cache_loading = True
+        
+        if show_loading_screen:
+            self.show_loading("กำลังโหลดข้อมูลยา...", "กรุณารอสักครู่")
+        
+        # เริ่ม Thread ใหม่เพื่อโหลดข้อมูล
+        threading.Thread(
+            target=self._medications_worker_thread, 
+            args=(show_loading_screen, on_complete_callback,), 
+            daemon=True
+        ).start()
+
+  
+    def _medications_worker_thread(self, show_loading_screen, on_complete_callback):
+        """Worker ที่รันใน Background Thread สำหรับ fetch_medications"""
+        
+        network_status = self.network_status_var.get()
+        new_data = []
+        error_message = None
+
+        try:
+            if network_status == "online":
+
+                print("Meds: ONLINE. กำลังดึงข้อมูลจากเซิร์ฟเวอร์...")
+                medicine_data = manageMedic.getMedicine(
+                    self.user['id'], self.user['device_id']
+                )
+                
+                if medicine_data['status']:
+                    new_data = medicine_data['Data']
+                    
+
+                    try:
+                        with open(self.MEDICINE_CACHE_FILE, "w", encoding="utf-8") as f:
+                            json.dump(new_data, f, indent=4)
+                        print(f"Meds: บันทึกข้อมูลใหม่ลง {self.MEDICINE_CACHE_FILE} สำเร็จ")
+                    except Exception as e:
+                        print(f"Meds: ไม่สามารถเขียนไฟล์แคช: {e}")
+                    
+
+                    if show_loading_screen:
+                        self.after(0, lambda: self.notifier.show_notification("โหลดข้อมูลยาสำเร็จ", success=True))
+                else:
+                    error_message = medicine_data['message']
+
+            else:
+
+                print(f"Meds: OFFLINE. กำลังโหลดจาก {self.MEDICINE_CACHE_FILE}...")
+                if os.path.exists(self.MEDICINE_CACHE_FILE):
+                    try:
+                        with open(self.MEDICINE_CACHE_FILE, "r", encoding="utf-8") as f:
+                            new_data = json.load(f)
+                        if show_loading_screen:
+                            self.after(0, lambda: self.notifier.show_notification("โหลดข้อมูลจากแคช (Offline)", success=True))
+                    except Exception as e:
+                        error_message = f"ไม่สามารถอ่านไฟล์แคช: {e}"
+                else:
+                    error_message = "Offline และไม่พบไฟล์แคชข้อมูลยา"
+
+        except requests.exceptions.RequestException as e:
+
+            error_message = f"ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์: {e}"
+            print(f"Error in _medications_worker_thread: {e}")
+        except Exception as e:
+
+            error_message = f"เกิดข้อผิดพลาด: {e}"
+            print(f"Error in _medications_worker_thread: {e}")
+
+
+        with self.medicine_data_lock:
+
+            self.cached_medications = new_data
+        
+        if error_message:
+            self.after(0, lambda: self.notifier.show_notification(error_message, success=False))
+
+
+        if on_complete_callback:
+            self.after(0, on_complete_callback)
+
+        if show_loading_screen:
+            self.after(0, self.hide_loading)
+
+        self._is_med_cache_loading = False
+
+
     def _async_update_wifi_status(self, is_connected: bool):
         """
         ฟังก์ชันนี้ถูกเรียกโดย Background Thread เพื่อส่งค่ากลับมายัง Main Thread
@@ -4286,46 +4772,139 @@ class MainApp(ctk.CTk):
         self.after(0, lambda: self._update_wifi_status_gui(is_connected))
         
     def _update_wifi_status_gui(self, is_connected: bool):
-        """
-        ฟังก์ชันนี้รันใน Main Thread และอัปเดต self.entry_status ใน Info Frame อย่างปลอดภัย
-        """
-        # ----------------------------------------------------------------------------------
-        # แก้ไข: ลบบรรทัด 'from . import info' ที่ทำให้เกิด ImportError ออก
-        # และเปลี่ยนไปใช้วิธีค้นหา Frame Instance ที่มี self.entry_status แทน
-        # ----------------------------------------------------------------------------------
+        old_status = self.network_status_var.get()
         
+        # 2. อัปเดตสถานะใหม่
+        new_status = "online" if is_connected else "offline"
+        self.network_status_var.set(new_status)
+        
+        # --- (3. ส่วนอัปเดต UI หน้า info ของคุณ) ---
         info_frame = None
-        # วนลูปในค่า (Value) ของ self.frames เพื่อค้นหา Frame Instance ที่มี entry_status
         for frame_instance in self.frames.values():
-             # ตรวจสอบว่า Frame Instance นั้นมี attribute ชื่อ entry_status หรือไม่
              if hasattr(frame_instance, 'entry_status'):
-                 info_frame = frame_instance
-                 break
+                info_frame = frame_instance
+                break
+        
+        if info_frame:
+            entry = info_frame.entry_status
+            new_color = "#2E7D32" if is_connected else "#D32F2F"
+            try:
+                entry.configure(state='normal')
+                entry.delete(0, ctk.END)
+                entry.insert(0, new_status) 
+                entry.configure(state='disabled', text_color=new_color)
+            except Exception as e:
+                print(f"❌ Error updating entry_status in GUI: {e}")
 
-        if not info_frame:
-            # Frame ที่มี entry_status ยังไม่ถูกสร้าง หรือยังไม่ถูกเก็บใน self.frames
+
+
+        if old_status == "offline" and new_status == "online":
+            print("✅ Network is BACK ONLINE. Checking for offline tasks to sync...")
+            # เริ่มการซิงค์ใน Thread แยก เพื่อไม่ให้ UI ค้าง
+            threading.Thread(target=self.sync_offline_tasks, daemon=True).start()
+
+    def sync_offline_tasks(self):
+        QUEUE_FILE = "offline_schedule_queue.json"
+        
+        if not os.path.exists(QUEUE_FILE):
+            print("Sync: ไม่พบไฟล์คิวออฟไลน์")
             return
 
-        entry = info_frame.entry_status
-        new_status = "online" if is_connected else "offline"
-        new_color = "#2E7D32" if is_connected else "#D32F2F" # เขียว/แดง
-        
+        # 1. อ่านคิว
+        tasks = []
         try:
-            # 1. อนุญาตให้แก้ไข Entry ชั่วคราว (state='normal')
-            entry.configure(state='normal')
-            
-            # 2. ล้างข้อความเดิม
-            entry.delete(0, ctk.END)
-            
-            # 3. ใส่ข้อความใหม่
-            entry.insert(0, new_status)
-            
-            # 4. ล็อก Entry ไม่ให้แก้ไข และเปลี่ยนสีข้อความ
-            entry.configure(state='disabled', text_color=new_color)
-            
+            with open(QUEUE_FILE, "r", encoding="utf-8") as f:
+                tasks = json.load(f)
+            if not tasks or not isinstance(tasks, list):
+                print("Sync: ไฟล์คิวว่างเปล่า หรือรูปแบบผิด")
+                os.remove(QUEUE_FILE) # ลบไฟล์ที่ไม่มีข้อมูล
+                return
         except Exception as e:
-            print(f"❌ Error updating entry_status in GUI: {e}")
+            print(f"Sync: Error reading queue file: {e}")
+            return
+            
+        print(f"Sync: พบ {len(tasks)} task ที่ค้างอยู่. เริ่มการซิงค์...")
+        
+        remaining_tasks = [] # เก็บ task ที่ยังซิงค์ไม่สำเร็จ
+        synced_count = 0
 
+        # 2. วนลูป xử lý từng task
+        for task in tasks:
+            try:
+                # ⭐️ [แก้ไข] ดึง type มาเก็บไว้ก่อน
+                task_type = task.get("type")
+                
+                # --- Task 1: ตั้งค่าวันที่ (โค้ดเดิมของคุณ) ---
+                if task_type == "set_time" and "payload" in task:
+                    payload = task["payload"]
+                    
+                    result = set_dispensing_time.set_time(
+                        payload['device_id'],
+                        payload['start_date'],
+                        payload['end_date']
+                    )
+                    
+                    if result and result.get('status') == True:
+                        print(f"Sync: ซิงค์ task 'set_time' {task['timestamp']} สำเร็จ")
+                        synced_count += 1
+                    else:
+                        print(f"Sync: เซิร์ฟเวอร์ปฏิเสธ task 'set_time' {task['timestamp']}. จะลองใหม่รอบหน้า")
+                        remaining_tasks.append(task)
+                
+                # --- ⭐️ [เพิ่ม] Task 2: ตั้งค่ามื้อยา (จาก JSON ที่คุณส่งมา) ⭐️ ---
+                elif task_type == "set_meal" and "payload" in task:
+                    payload = task["payload"]
+                    
+                    # เรียกใช้ set_meal จาก object ที่เป็น global
+                    result = set_dispensing_time.set_meal(
+                        payload['device_id'],
+                        payload['user_id'],
+                        payload['meal_data'] # ⭐️ ส่งข้อมูล meal_data ที่เราบันทึกไว้
+                    )
+                    
+                    if result and result.get('status') == True:
+                        print(f"Sync: ซิงค์ task 'set_meal' {task['timestamp']} สำเร็จ")
+                        synced_count += 1
+                    else:
+                        print(f"Sync: เซิร์ฟเวอร์ปฏิเสธ task 'set_meal' {task['timestamp']}. จะลองใหม่รอบหน้า")
+                        remaining_tasks.append(task)
+                # -----------------------------------------------------------------
+
+                else:
+                    print(f"Sync: ข้าม task ประเภทที่ไม่รู้จัก: {task_type}")
+
+            except Exception as e:
+                print(f"Sync: เกิดข้อผิดพลาดขณะซิงค์ task {task['timestamp']}: {e}. จะลองใหม่รอบหน้า")
+                remaining_tasks.append(task) # บันทึกกลับเข้าคิว
+            
+            # หน่วงเวลาเล็กน้อย
+            time.sleep(1) 
+
+        # 3. เขียน task ที่ยังทำไม่สำเร็จ กลับลงไฟล์
+        try:
+            with open(QUEUE_FILE, "w", encoding="utf-8") as f:
+                json.dump(remaining_tasks, f, indent=4)
+            
+            # แจ้งเตือนใน UI (ต้องใช้ self.after เพื่อให้รันใน Main Thread)
+            if synced_count > 0:
+                print(f"Sync: ซิงค์สำเร็จ {synced_count} รายการ")
+                self.after(0, lambda: self.notifier.show_notification(
+                    f"ซิงค์ข้อมูล {synced_count} รายการสำเร็จ", success=True
+                ))
+            
+            if len(remaining_tasks) > 0:
+                print(f"Sync: {len(remaining_tasks)} task ยังคงค้างอยู่ในคิว")
+                self.after(0, lambda: self.notifier.show_notification(
+                    f"ซิงค์ข้อมูลไม่สำเร็จ {len(remaining_tasks)} รายการ", success=False
+                ))
+            
+            if len(remaining_tasks) == 0 and synced_count > 0:
+                 print("Sync: คิวว่างเปล่าแล้ว")
+                 os.remove(QUEUE_FILE) # ลบไฟล์ทิ้งถ้าซิงค์หมดแล้ว
+
+        except Exception as e:
+            print(f"Sync: CRITICAL error writing back to queue file: {e}")
+            
     def start_background_polling(self):
         if not self.polling_thread_active:
            print("--- [MainApp] Starting background polling thread... ---")

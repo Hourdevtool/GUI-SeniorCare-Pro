@@ -4,13 +4,8 @@ import time
 import requests
 import json
 
-# นำเข้า Devicestatus จากไฟล์ device_status.py
-# อิงตามโครงสร้างใน main.py ที่มีการนำเข้าจาก server.device_status
-try:
-    from server.device_status import Devicestatus
-except ImportError:
-    # ใช้ import นี้หากไฟล์ device_status.py อยู่ในโฟลเดอร์เดียวกันกับ network_monitor.py
-    from device_status import Devicestatus 
+from server.device_status import Devicestatus
+
 
 # class NetworkMonitor (คงโครงสร้างเดิม)
 class NetworkMonitor(threading.Thread):
@@ -72,10 +67,8 @@ class NetworkMonitor(threading.Thread):
                     # ใช้ Devicestatus.setstatus(id, status)
                     result = self.device_status_updater.setstatus(self.id, current_db_status)
                     self.ui_callback(is_connected) 
-                    print(result)
                     # ตรวจสอบว่าการอัปเดตสำเร็จหรือไม่ (ตรวจสอบจาก result ที่ไม่เป็น None)
                     if result is not None:
-                        print(f"✅ Status updated successfully to DB ({current_db_status}).")
                         self.last_status = current_db_status
                         
                         # 3. ส่งค่ากลับไปยัง MainApp ผ่าน Callback Function

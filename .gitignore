@@ -4,4 +4,7 @@
 /*Database
 /__pycache__
 .env
-
+/meal_config.json
+/offline_schedule_queue.json
+/offline_medicineData.json
+/time_data.json

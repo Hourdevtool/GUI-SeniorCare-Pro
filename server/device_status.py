@@ -8,7 +8,6 @@ class Devicestatus:
         try:
             response = requests.get(url)
             response.raise_for_status()
-            print(response.text )
             ral_text = response.text 
             json_start = ral_text.find('{')
             if json_start == -1:
