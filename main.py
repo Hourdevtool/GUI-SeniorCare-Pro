@@ -15,7 +15,8 @@ from babel.dates import format_date
 from lib.set_time import default_serializer
 from lib.serial_handler import recivetime,start_Serial_loop
 from notifier import Notifier
-
+from network_monitor import NetworkMonitor
+import serial
 # --ใหม่--
 #import pywinstyles
 
@@ -2818,11 +2819,10 @@ class info(ctk.CTkFrame):
         self.entry_owner.bind("<Key>", disable_editing)
 
         ctk.CTkLabel(form_frame, text="สถานะเครื่อง", text_color="black", font=("Arial", 18)).grid(row=1, column=2, sticky="w", padx=10, pady=5)
-        entry_status = ctk.CTkEntry(form_frame, fg_color="white", text_color="black", font=("Arial", 18))
-        entry_status.grid(row=1, column=3, padx=5, pady=5, sticky="ew")
-        entry_status.insert(0, "online")
-        entry_status.bind("<Key>", disable_editing)
-
+        self.entry_status = ctk.CTkEntry(form_frame, fg_color="white", text_color="black", font=("Arial", 18), state='disabled') # เปลี่ยน state เป็น 'disabled' ตั้งแต่เริ่มต้น
+        self.entry_status.grid(row=1, column=3, padx=5, pady=5, sticky="ew")
+        self.entry_status.bind("<Key>", disable_editing)
+        
         # Row 2
         ctk.CTkLabel(form_frame, text="อีเมล", text_color="black", font=("Arial", 18)).grid(row=2, column=0, sticky="w", padx=10, pady=5)
         self.entry_email = ctk.CTkEntry(form_frame, fg_color="white", text_color="black", font=("Arial", 18))
@@ -4240,7 +4240,71 @@ class MainApp(ctk.CTk):
         # โหลดข้อมูลผู้ใช้และแสดงหน้าที่เหมาะสม
         self.load_user_data()
         self.start_serial_thread()
-    
+
+        if hasattr(self, 'user') and isinstance(self.user, dict) and 'device_id' in self.user:
+            device_id_to_monitor = self.user.get('device_id')
+            
+            if device_id_to_monitor:
+                self.network_monitor = NetworkMonitor(
+                    device_id=device_id_to_monitor, 
+                    ui_callback=self._async_update_wifi_status, # ใช้ฟังก์ชันที่เราเพิ่งสร้าง
+                    monitor_interval=60
+                )
+                self.network_monitor.start()
+                print(f"✅ Started Network Monitor for Device ID: {device_id_to_monitor}")
+            else:
+                 print("❌ Cannot start Network Monitor: 'device_id' not found in self.user.")
+        else:
+            print("⚠️ self.user not defined or loaded yet. Network Monitor not started.")
+        # ---------------------------------------------------
+        
+    def _async_update_wifi_status(self, is_connected: bool):
+        """
+        ฟังก์ชันนี้ถูกเรียกโดย Background Thread เพื่อส่งค่ากลับมายัง Main Thread
+        """
+        # ใช้ self.after() เพื่อให้โค้ดรันใน Main Thread อย่างปลอดภัย (UI Thread)
+        self.after(0, lambda: self._update_wifi_status_gui(is_connected))
+        
+    def _update_wifi_status_gui(self, is_connected: bool):
+        """
+        ฟังก์ชันนี้รันใน Main Thread และอัปเดต self.entry_status ใน Info Frame อย่างปลอดภัย
+        """
+        # ----------------------------------------------------------------------------------
+        # แก้ไข: ลบบรรทัด 'from . import info' ที่ทำให้เกิด ImportError ออก
+        # และเปลี่ยนไปใช้วิธีค้นหา Frame Instance ที่มี self.entry_status แทน
+        # ----------------------------------------------------------------------------------
+        
+        info_frame = None
+        # วนลูปในค่า (Value) ของ self.frames เพื่อค้นหา Frame Instance ที่มี entry_status
+        for frame_instance in self.frames.values():
+             # ตรวจสอบว่า Frame Instance นั้นมี attribute ชื่อ entry_status หรือไม่
+             if hasattr(frame_instance, 'entry_status'):
+                 info_frame = frame_instance
+                 break
+
+        if not info_frame:
+            # Frame ที่มี entry_status ยังไม่ถูกสร้าง หรือยังไม่ถูกเก็บใน self.frames
+            return
+
+        entry = info_frame.entry_status
+        new_status = "online" if is_connected else "offline"
+        new_color = "#2E7D32" if is_connected else "#D32F2F" # เขียว/แดง
+        
+        try:
+            # 1. อนุญาตให้แก้ไข Entry ชั่วคราว (state='normal')
+            entry.configure(state='normal')
+            
+            # 2. ล้างข้อความเดิม
+            entry.delete(0, ctk.END)
+            
+            # 3. ใส่ข้อความใหม่
+            entry.insert(0, new_status)
+            
+            # 4. ล็อก Entry ไม่ให้แก้ไข และเปลี่ยนสีข้อความ
+            entry.configure(state='disabled', text_color=new_color)
+            
+        except Exception as e:
+            print(f"❌ Error updating entry_status in GUI: {e}")
 
     def start_background_polling(self):
         if not self.polling_thread_active:
@@ -4437,7 +4501,13 @@ class MainApp(ctk.CTk):
     def on_closing(self):
         """จัดการเมื่อปิดแอปพลิเคชัน"""
         try:
-            # บันทึกข้อมูลก่อนปิด (หากจำเป็น)
+            # --- หยุด Network Monitor Thread ก่อนปิด ---
+            if hasattr(self, 'network_monitor') and self.network_monitor.is_alive():
+                print("Stopping Network Monitor...")
+                self.network_monitor.stop()
+                self.network_monitor.join() 
+            # ------------------------------------------
+            
             print("กำลังปิดแอปพลิเคชัน...")
             self.destroy()
         except Exception as e:
