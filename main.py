@@ -21,7 +21,7 @@ from notifier import Notifier
 
 
 # nodel การเเจ้งเตือน
-from lib.alert import sendtoTelegram
+from lib.alert import sendtoTelegram,sendtoLine
 from lib.loadenv import PATH
 
 # model อ่านออกเสียง
@@ -1809,7 +1809,18 @@ class Frame4(ctk.CTkFrame):
                     )
                     if ai_advice['status']:
                         self.controller.advice = ai_advice['Advice']
+                        user_report = (
+                            f"📊 รายงานสุขภาพ\n"
+                            f"👤 ชื่อผู้ใช้งาน: {self.controller.user['firstname_th']} - {self.controller.user['lastname_th']}\n"
+                            f"💓 ความดันสูง: {self.systolic_var.get()}\n"
+                            f"💓 ความดันต่ำ: {self.diastolic_var.get()}\n"
+                            f"💓 ชีพจร: {self.pulse_var.get()}" 
+                        )
+                        sendtoTelegram(ai_advice['Advice'], self.controller.user['telegram_key'], user_report)
                         sendtoTelegram(ai_advice['Advice'], self.controller.user['telegram_key'], self.controller.user['telegram_id'])
+
+                        sendtoLine(self.controller.user['token_line'],self.controller.user['group_id'],user_report)
+                        sendtoLine(self.controller.user['token_line'],self.controller.user['group_id'],ai_advice['Advice'])
                         self.controller.notifier.show_notification("บันทึกคำแนะนำสำเร็จ", success=True)
                         controller.after(0, lambda: controller.show_frame(AIgen))
                     else:
@@ -2709,6 +2720,7 @@ class info(ctk.CTkFrame):
     
     def populate_user_info(self, data):
         """กรอกข้อมูลผู้ใช้ลงในฟอร์ม"""
+        print(f"populate_user_info:{data}")
         try:
             self.entry_owner.delete(0, 'end')
             self.entry_owner.insert(0, f"{data.get('firstname_th', '')} {data.get('lastname_th', '')}")
@@ -2725,14 +2737,17 @@ class info(ctk.CTkFrame):
             self.entry_device_id.delete(0, 'end')
             self.entry_device_id.insert(0, str(data.get('device_id', '')))
 
+            self.entry_line_token.delete(0, 'end')
+            self.entry_line_token.insert(0, str(data.get('token_line', '')))
+
+            self.entry_line_group.delete(0, 'end')
+            self.entry_line_group.insert(0, str(data.get('group_id', '')))
+
             self.entry_telegram_token.delete(0, 'end')
             self.entry_telegram_token.insert(0, str(data.get('telegram_key', '')))
 
             self.entry_telegram_id.delete(0, 'end')
             self.entry_telegram_id.insert(0, str(data.get('telegram_id', '')))
-
-            self.entry_telegram_group.delete(0, 'end')
-            self.entry_telegram_group.insert(0, str(data.get('url2', '')))
             
             # ซ่อนหน้าดาวโหลด
             self.controller.hide_loading()
@@ -2794,7 +2809,7 @@ class info(ctk.CTkFrame):
 
         # Form Frame
         form_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#FFFFFF", bg_color="#000001" ,
-                                   width=750, height=440)
+                                   width=750, height=480)
         form_frame.place(relx=0.5, rely=0.5, anchor="center")
         #pywinstyles.set_opacity(form_frame, value=0.8,color="#000001")
         
@@ -2848,18 +2863,22 @@ class info(ctk.CTkFrame):
         ctk.CTkLabel(form_frame, text="การแจ้งเตือน", text_color="#2D6A4F", font=("Arial", 22, "bold")).grid(row=4, column=0, columnspan=4, pady=(20, 20))
 
         # Row 5
-        ctk.CTkLabel(form_frame, text="หมายเลขโทเคน", text_color="black", font=("Arial", 18)).grid(row=5, column=0, sticky="w", padx=10, pady=5)
-        self.entry_telegram_token = ctk.CTkEntry(form_frame, fg_color="white", text_color="black", font=("Arial", 18))
-        self.entry_telegram_token.grid(row=5, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
+        ctk.CTkLabel(form_frame, text="หมายเลขโทเคนไลน์", text_color="black", font=("Arial", 18)).grid(row=5, column=0, sticky="w", padx=10, pady=5)
+        self.entry_line_token = ctk.CTkEntry(form_frame, fg_color="white", text_color="black", font=("Arial", 18))
+        self.entry_line_token.grid(row=5, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
+
+        ctk.CTkLabel(form_frame, text="ไอดี กลุ่มไลน์", text_color="black", font=("Arial", 18)).grid(row=6, column=0, sticky="w", padx=10, pady=5)
+        self.entry_line_group = ctk.CTkEntry(form_frame, fg_color="white", text_color="black", font=("Arial", 18))
+        self.entry_line_group.grid(row=6, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
 
         # Row 6
-        ctk.CTkLabel(form_frame, text="ไอดี เทเลแกรม", text_color="black", font=("Arial", 18)).grid(row=6, column=0, sticky="w", padx=10, pady=5)
-        self.entry_telegram_id = ctk.CTkEntry(form_frame, fg_color="white", text_color="black", font=("Arial", 18))
-        self.entry_telegram_id.grid(row=6, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
+        ctk.CTkLabel(form_frame, text="หมายเลขโทเคน เทเลแกรม", text_color="black", font=("Arial", 18)).grid(row=7, column=0, sticky="w", padx=10, pady=5)
+        self.entry_telegram_token = ctk.CTkEntry(form_frame, fg_color="white", text_color="black", font=("Arial", 18))
+        self.entry_telegram_token.grid(row=7, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
 
-        ctk.CTkLabel(form_frame, text="ลิงค์กลุ่ม", text_color="black", font=("Arial", 18)).grid(row=7, column=0, sticky="w", padx=10, pady=5)
-        self.entry_telegram_group = ctk.CTkEntry(form_frame, fg_color="white", text_color="black", font=("Arial", 18))
-        self.entry_telegram_group.grid(row=7, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
+        ctk.CTkLabel(form_frame, text="ไอดี เทเลแกรม", text_color="black", font=("Arial", 18)).grid(row=8, column=0, sticky="w", padx=10, pady=5)
+        self.entry_telegram_id = ctk.CTkEntry(form_frame, fg_color="white", text_color="black", font=("Arial", 18))
+        self.entry_telegram_id.grid(row=8, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
 
         # Save Button
         def save_data():
@@ -2867,9 +2886,10 @@ class info(ctk.CTkFrame):
                 self.userid,
                 self.result['device_id'],
                 self.entry_line_id.get(),
+                self.entry_line_token.get(),
                 self.entry_telegram_token.get(),
                 self.entry_telegram_id.get(),
-                self.entry_telegram_group.get()
+                self.entry_line_group.get(),
             )
 
             if success['status']:
@@ -2882,7 +2902,7 @@ class info(ctk.CTkFrame):
         btn_save = ctk.CTkButton(form_frame, text="บันทึกข้อมูล", command=save_data,
                                  fg_color="green", text_color="white",
                                  font=("Arial", 20, "bold"), height=40, corner_radius=20)
-        btn_save.grid(row=8, column=0, columnspan=4, pady=(10, 10))
+        btn_save.grid(row=9, column=0, columnspan=4, pady=(10, 10))
 
 
 

@@ -43,7 +43,7 @@ class infoData :
         #     return {'status':False ,'message':{e}}
 # ----------------  lib ตัวทดสอบ-----------------------------
     #ฟังชั่นในการอัพเดตข้อมูลผู้ใช้งาน
-    def updateData(self,id,device_id,lineid,telegram_key,telegram_id,url2):
+    def updateData(self,id,device_id,lineid,telegram_key,telegram_id,line_token,group_id):
          
          update_url = 'http://medic.ctnphrae.com/php/api/updateinfo.php'
 
@@ -53,7 +53,8 @@ class infoData :
               "line_id": lineid,
               "telegram_key": telegram_key,
               "telegram_id": telegram_id,
-              "url2": url2
+              "line_token": line_token,
+              "group_id": group_id
          }
 
          response = requests.post(update_url, json=newdata)
