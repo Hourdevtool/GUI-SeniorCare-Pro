@@ -995,83 +995,87 @@ class HomePage(ctk.CTkFrame):
             self.show_medication_error() # (ใช้ฟังก์ชันเดิมของคุณ)
 
     def _fetch_medication_data_in_background(self):
+        
         CACHE_FILE = "time_data.json" # ⭐️ ชื่อไฟล์แคช
         meal_data = None
         error_message = None
+        data_source = "" # สำหรับ Log
 
         try:
-         
+            # 0. ตรวจสอบว่าล็อกอินหรือยัง (สำคัญมาก)
             if not (hasattr(self.controller, 'user') and self.controller.user):
                 print("Background Thread: ไม่พบข้อมูลผู้ใช้")
                 self.after(0, self._render_medication_data, None, "No user data")
                 return
 
-         
-            network_status = self.controller.network_status_var.get()
-
-            if network_status == "online":
-                print("Background Thread (HomePage): Online. กำลังดึงข้อมูลจากเซิร์ฟเวอร์...")
-                meal_api_result = set_dispensing_time.get_meal(
-                    self.controller.user['device_id'],
-                    self.controller.user['id']
-                )
+            # ⭐️ [FIX] 1. "พยายาม" ดึงข้อมูลจากเซิร์ฟเวอร์ก่อนเสมอ ⭐️
+            # (เราจะไม่ตรวจสอบ network_status_var ที่นี่แล้ว)
+            print("Background Thread (HomePage): กำลังพยายามดึงข้อมูลจากเซิร์ฟเวอร์...")
+            meal_api_result = set_dispensing_time.get_meal(
+                self.controller.user['device_id'],
+                self.controller.user['id']
+            )
+            
+            # --- 2. ถ้าดึงข้อมูลสำเร็จ (ONLINE) ---
+            if meal_api_result and 'data' in meal_api_result:
+                meal_data = meal_api_result # นี่คือโครงสร้าง {'data': [...]}
+                data_to_cache = meal_api_result['data'] # นี่คือข้อมูล [...] ที่จะบันทึก
+                data_source = "Server (Online)"
                 
-                if meal_api_result and 'data' in meal_api_result:
-                    meal_data = meal_api_result 
-                    data_to_cache = meal_api_result['data'] 
-                    try:
-                        with open(CACHE_FILE, "w", encoding="utf-8") as f:
-                            json.dump(data_to_cache, f, indent=4)
-                        print(f"Background Thread (HomePage): บันทึกข้อมูลใหม่ลง {CACHE_FILE} สำเร็จ")
-                    except Exception as e:
-                        print(f"Background Thread (HomePage): ไม่สามารถเขียนไฟล์แคช: {e}")
+                # --- 2b. บันทึกข้อมูลใหม่ลงไฟล์แคช (time_data.json) ---
+                try:
+                    with open(CACHE_FILE, "w", encoding="utf-8") as f:
+                        json.dump(data_to_cache, f, indent=4)
+                    print(f"Background Thread (HomePage): บันทึกข้อมูลใหม่ลง {CACHE_FILE} สำเร็จ")
+                except Exception as e:
+                    print(f"Background Thread (HomePage): ไม่สามารถเขียนไฟล์แคช: {e}")
                         
-                else:
-                 
-                    print("Background Thread (HomePage): เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง")
-                    error_message = "ข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง"
-
             else:
-             
-                print("Background Thread (HomePage): Offline. กำลังโหลดจากแคช...")
-                error_message = "Offline"
+                # เซิร์ฟเวอร์ตอบกลับมาแต่ข้อมูลผิดพลาด (เช่น 'status': false)
+                print("Background Thread (HomePage): เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง")
+                error_message = "ข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง" # จะไปบังคับให้โหลดแคชแทน
 
         except requests.exceptions.RequestException as e:
-         
-            print(f"Background Thread (HomePage): เกิดข้อผิดพลาด Network: {e}")
-            error_message = str(e) 
+            # --- 3. ถ้าดึงข้อมูล "ล้มเหลว" (OFFLINE หรือ Server ล่ม) ---
+            # (นี่คือจุดที่ดักจับ Error 'getaddrinfo failed' ที่คุณเห็น)
+            print(f"Background Thread (HomePage): เกิดข้อผิดพลาด Network (Offline): {e}")
+            error_message = str(e) # บังคับให้ไปโหลดแคช
+            
         except Exception as e:
- 
+            # --- 4. ERROR อื่นๆ (เช่น โค้ดผิด) ---
             print(f"Background Thread (HomePage): เกิดข้อผิดพลาดร้ายแรง: {e}")
             self.after(0, self._render_medication_data, None, str(e))
             return
 
+        # --- 5. สรุปผลและแสดงผล ---
         
         if meal_data:
-            print("Background Thread (HomePage): ดึงข้อมูลสำเร็จ กำลังแสดงผล...")
+            # --- A: ถ้าดึงข้อมูล Online สำเร็จ ---
+            print(f"Background Thread (HomePage): ดึงข้อมูลสำเร็จจาก {data_source} กำลังแสดงผล...")
             if 'data' in meal_data:
                  recivetime(meal_data['data']) 
             self.after(0, self._render_medication_data, meal_data, None)
         
         elif error_message:
-            print(f"Background Thread (HomePage): ดึงข้อมูลล้มเหลว ({error_message}). กำลังโหลดจากแคช...")
+            # --- B: ถ้า Offline หรือ Online แต่ดึงล้มเหลว -> ให้โหลดจากแคช ---
+            print(f"Background Thread (HomePage): ดึงข้อมูลล้มเหลว ({error_message}). กำลังโหลดจากแคช {CACHE_FILE}...")
             if os.path.exists(CACHE_FILE):
                 try:
                     with open(CACHE_FILE, "r", encoding="utf-8") as f:
                         cached_data_list = json.load(f) 
                     
+                    # ⭐️ ห่อข้อมูลกลับในรูปแบบที่ _render_medication_data คาดหวัง
                     meal_data = {'data': cached_data_list} 
                     
                     print("Background Thread (HomePage): โหลดแคชสำเร็จ กำลังแสดงผล...")
-                    recivetime(meal_data['data']) 
-                    self.after(0, self._render_medication_data, meal_data, None) 
+                    if 'data' in meal_data: # ตรวจสอบอีกครั้งเพื่อความปลอดภัย
+                        recivetime(meal_data['data']) 
+                    self.after(0, self._render_medication_data, meal_data, None) # ส่งข้อมูลจากแคชไปแสดงผล
                 except Exception as e:
                     print(f"Background Thread (HomePage): ไม่สามารถอ่านไฟล์แคช: {e}")
                     self.after(0, self._render_medication_data, None, f"Offline และอ่านไฟล์แคชไม่ได้: {e}")
             else:
-                print("Background Thread (HomePage): ไม่พบไฟล์แคช")
                 self.after(0, self._render_medication_data, None, "Offline และไม่พบข้อมูลที่บันทึกไว้")
-
     def _render_medication_data(self, meal_data, error_message):
 
         # print("Main Thread: กำลังอัปเดต UI ด้วยข้อมูลยา...")
@@ -4655,12 +4659,7 @@ class MainApp(ctk.CTk):
 
 
     def fetch_medications(self, show_loading_screen=True, on_complete_callback=None):
-        """
-        ฟังก์ชัน Global สำหรับโหลด/แคชข้อมูลยา
-        - show_loading_screen: True = แสดงหน้าโหลด (สำหรับ Frame2)
-        - show_loading_screen: False = โหลดเงียบๆ (สำหรับ HomePage)
-        - on_complete_callback: ฟังก์ชันที่จะรันเมื่อเสร็จ (เช่น Frame2.refresh_medications)
-        """
+       
         
         # ⭐️⭐️ นี่คือส่วนที่ "กัน error" ที่คุณต้องการ ⭐️⭐️
         if not self.user:
@@ -4692,78 +4691,86 @@ class MainApp(ctk.CTk):
 
   
     def _medications_worker_thread(self, show_loading_screen, on_complete_callback):
-        """Worker ที่รันใน Background Thread สำหรับ fetch_medications"""
-        
-        network_status = self.network_status_var.get()
+
         new_data = []
         error_message = None
 
         try:
-            if network_status == "online":
-
-                print("Meds: ONLINE. กำลังดึงข้อมูลจากเซิร์ฟเวอร์...")
-                medicine_data = manageMedic.getMedicine(
-                    self.user['id'], self.user['device_id']
-                )
+            # ⭐️ [FIX] 1. "พยายาม" ดึงข้อมูลจากเซิร์ฟเวอร์ก่อนเสมอ ⭐️
+            print("Meds: กำลังพยายามดึงข้อมูลจากเซิร์ฟเวอร์...")
+            medicine_data = manageMedic.getMedicine(
+                self.user['id'], self.user['device_id']
+            )
+            
+            # --- 2. ถ้าดึงข้อมูลสำเร็จ (ONLINE) ---
+            if medicine_data['status']:
+                new_data = medicine_data['Data']
                 
-                if medicine_data['status']:
-                    new_data = medicine_data['Data']
-                    
-
-                    try:
-                        with open(self.MEDICINE_CACHE_FILE, "w", encoding="utf-8") as f:
-                            json.dump(new_data, f, indent=4)
-                        print(f"Meds: บันทึกข้อมูลใหม่ลง {self.MEDICINE_CACHE_FILE} สำเร็จ")
-                    except Exception as e:
-                        print(f"Meds: ไม่สามารถเขียนไฟล์แคช: {e}")
-                    
-
-                    if show_loading_screen:
-                        self.after(0, lambda: self.notifier.show_notification("โหลดข้อมูลยาสำเร็จ", success=True))
-                else:
-                    error_message = medicine_data['message']
-
+                # 2a. บันทึกข้อมูลใหม่ลงไฟล์แคช (JSON)
+                try:
+                    with open(self.MEDICINE_CACHE_FILE, "w", encoding="utf-8") as f:
+                        json.dump(new_data, f, indent=4)
+                    print(f"Meds: บันทึกข้อมูลใหม่ลง {self.MEDICINE_CACHE_FILE} สำเร็จ")
+                except Exception as e:
+                    print(f"Meds: ไม่สามารถเขียนไฟล์แคช: {e}")
+                
+                # 2b. แจ้งเตือน (ถ้าจำเป็น)
+                if show_loading_screen:
+                    self.after(0, lambda: self.notifier.show_notification("โหลดข้อมูลยาสำเร็จ", success=True))
+            
             else:
-
-                print(f"Meds: OFFLINE. กำลังโหลดจาก {self.MEDICINE_CACHE_FILE}...")
-                if os.path.exists(self.MEDICINE_CACHE_FILE):
-                    try:
-                        with open(self.MEDICINE_CACHE_FILE, "r", encoding="utf-8") as f:
-                            new_data = json.load(f)
-                        if show_loading_screen:
-                            self.after(0, lambda: self.notifier.show_notification("โหลดข้อมูลจากแคช (Offline)", success=True))
-                    except Exception as e:
-                        error_message = f"ไม่สามารถอ่านไฟล์แคช: {e}"
-                else:
-                    error_message = "Offline และไม่พบไฟล์แคชข้อมูลยา"
+                # 2c. เซิร์ฟเวอร์ตอบกลับมาแต่ข้อมูลผิดพลาด (เช่น 'status': false)
+                error_message = medicine_data.get('message', 'เซิร์ฟเวอร์ปฏิเสธการร้องขอ')
 
         except requests.exceptions.RequestException as e:
-
-            error_message = f"ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์: {e}"
-            print(f"Error in _medications_worker_thread: {e}")
+            # --- 3. ถ้าดึงข้อมูล "ล้มเหลว" (OFFLINE หรือ Server ล่ม) ---
+            print(f"Meds: เกิดข้อผิดพลาด Network (Offline): {e}")
+            error_message = f"ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์: {e}" # ⭐️ บังคับให้ไปโหลดแคช
+            
         except Exception as e:
-
+            # --- 4. ERROR อื่นๆ (เช่น โค้ดผิด) ---
             error_message = f"เกิดข้อผิดพลาด: {e}"
             print(f"Error in _medications_worker_thread: {e}")
 
-
+        
+        # --- 5. สรุปผลและแสดงผล ---
+        
+        # อัปเดตแคช "global" ใน MainApp
         with self.medicine_data_lock:
-
             self.cached_medications = new_data
         
         if error_message:
-            self.after(0, lambda: self.notifier.show_notification(error_message, success=False))
-
+            # --- 5a. ถ้าเกิด Error (Onlineล่ม หรือ Offline) -> ให้โหลดจากแคช ---
+            print(f"Meds: ดึงข้อมูลล้มเหลว ({error_message}). กำลังโหลดจากแคช...")
+            if os.path.exists(self.MEDICINE_CACHE_FILE):
+                try:
+                    with open(self.MEDICINE_CACHE_FILE, "r", encoding="utf-8") as f:
+                        new_data_from_cache = json.load(f)
+                    
+                    # ⭐️ อัปเดต cache global อีกครั้งด้วยข้อมูลจากไฟล์
+                    with self.medicine_data_lock:
+                        self.cached_medications = new_data_from_cache
+                        
+                    if show_loading_screen:
+                        self.after(0, lambda: self.notifier.show_notification("โหลดข้อมูลจากแคช (Offline)", success=True))
+                except Exception as e:
+                    print(f"Meds: ไม่สามารถอ่านไฟล์แคช: {e}")
+                    self.after(0, lambda: self.notifier.show_notification(f"Offline และอ่านไฟล์แคชไม่ได้: {e}", success=False))
+            else:
+                # --- 5b. Offline และไม่มีไฟล์แคช ---
+                print(f"Meds: ไม่พบไฟล์แคช {self.MEDICINE_CACHE_FILE}")
+                self.after(0, lambda: self.notifier.show_notification("Offline และไม่พบไฟล์แคชข้อมูลยา", success=False))
+        
 
         if on_complete_callback:
             self.after(0, on_complete_callback)
+            
 
         if show_loading_screen:
             self.after(0, self.hide_loading)
+            
 
         self._is_med_cache_loading = False
-
-
     def _async_update_wifi_status(self, is_connected: bool):
         """
         ฟังก์ชันนี้ถูกเรียกโดย Background Thread เพื่อส่งค่ากลับมายัง Main Thread
@@ -4815,7 +4822,7 @@ class MainApp(ctk.CTk):
                     )
 
 
-                    sendtoLine(line_token, line_group, line_message)
+                    # sendtoLine(line_token, line_group, line_message)
                 
                 except Exception as e:
                     print(f"❌ เกิดข้อผิดพลาดขณะเตรียมส่งแจ้งเตือนออนไลน์: {e}")
