@@ -6,7 +6,6 @@ import json
 
 from server.device_status import Devicestatus
 
-
 # class NetworkMonitor (คงโครงสร้างเดิม)
 class NetworkMonitor(threading.Thread):
     """
@@ -67,6 +66,7 @@ class NetworkMonitor(threading.Thread):
                     # ใช้ Devicestatus.setstatus(id, status)
                     result = self.device_status_updater.setstatus(self.id, current_db_status)
                     self.ui_callback(is_connected) 
+                    print(result)
                     # ตรวจสอบว่าการอัปเดตสำเร็จหรือไม่ (ตรวจสอบจาก result ที่ไม่เป็น None)
                     if result is not None:
                         self.last_status = current_db_status

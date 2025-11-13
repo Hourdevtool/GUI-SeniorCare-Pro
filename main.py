@@ -1942,9 +1942,7 @@ class Frame4(ctk.CTkFrame):
                             f"💓 ความดันต่ำ: {self.diastolic_var.get()}\n"
                             f"💓 ชีพจร: {self.pulse_var.get()}" 
                         )
-                        sendtoTelegram(ai_advice['Advice'], self.controller.user['telegram_key'], user_report)
-                        sendtoTelegram(ai_advice['Advice'], self.controller.user['telegram_key'], self.controller.user['telegram_id'])
-
+                    
                         sendtoLine(self.controller.user['token_line'],self.controller.user['group_id'],user_report)
                         sendtoLine(self.controller.user['token_line'],self.controller.user['group_id'],ai_advice['Advice'])
                         self.controller.notifier.show_notification("บันทึกคำแนะนำสำเร็จ", success=True)
@@ -4581,6 +4579,8 @@ class MainApp(ctk.CTk):
         self.last_known_schedule_data = None 
         self.data_lock = threading.Lock()
 
+        self.has_sent_online_notification = False
+
         # ปรับขนาดหน้าจอเป็น 1024x600
         self.geometry("1024x800")
         self.notifier = Notifier(self)
@@ -4774,14 +4774,11 @@ class MainApp(ctk.CTk):
     def _update_wifi_status_gui(self, is_connected: bool):
         old_status = self.network_status_var.get()
         
-        # 2. อัปเดตสถานะใหม่
         new_status = "online" if is_connected else "offline"
         self.network_status_var.set(new_status)
-        
-        # --- (3. ส่วนอัปเดต UI หน้า info ของคุณ) ---
         info_frame = None
         for frame_instance in self.frames.values():
-             if hasattr(frame_instance, 'entry_status'):
+            if hasattr(frame_instance, 'entry_status'):
                 info_frame = frame_instance
                 break
         
@@ -4797,12 +4794,42 @@ class MainApp(ctk.CTk):
                 print(f"❌ Error updating entry_status in GUI: {e}")
 
 
+        if new_status == "online" and not self.has_sent_online_notification:
+            
+            self.has_sent_online_notification = True
+            
+            if self.user:
+                try:
+                    user_name = self.user.get('firstname_th', 'ผู้ใช้')
+                    device_id = self.user.get('device_id', 'N/A')
+                    line_token = self.user.get('token_line')
+                    line_group = self.user.get('group_id')
+                    tg_token = self.user.get('telegram_key')
+                    tg_id = self.user.get('telegram_id')
 
+                    line_message = (
+                        f"[SeniorCare Pro]\n"
+                        f"เครื่องจ่ายยา (ID: {device_id})\n"
+                        f"สำหรับคุณ: {user_name}\n"
+                        f"ได้เชื่อมต่ออินเทอร์เน็ตและพร้อมใช้งานแล้ว"
+                    )
+
+
+                    sendtoLine(line_token, line_group, line_message)
+                
+                except Exception as e:
+                    print(f"❌ เกิดข้อผิดพลาดขณะเตรียมส่งแจ้งเตือนออนไลน์: {e}")
+            else:
+                print("⚠️ ไม่สามารถส่งแจ้งเตือนออนไลน์ได้, self.user ยังไม่ถูกโหลด")
+        
+        # --- END: โค้ดใหม่ ---
+
+
+        # 6. ตรวจสอบเพื่อ Sync ข้อมูล (โค้ดเดิมของคุณ)
         if old_status == "offline" and new_status == "online":
             print("✅ Network is BACK ONLINE. Checking for offline tasks to sync...")
             # เริ่มการซิงค์ใน Thread แยก เพื่อไม่ให้ UI ค้าง
             threading.Thread(target=self.sync_offline_tasks, daemon=True).start()
-
     def sync_offline_tasks(self):
         QUEUE_FILE = "offline_schedule_queue.json"
         
