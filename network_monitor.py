@@ -49,8 +49,7 @@ class NetworkMonitor(threading.Thread):
             return False
 
     def run(self):
-        """เมธอดที่รันใน Background ลูป"""
-        print(f"✅ Network Monitor Thread Started for Device ID: {self.id}")
+
         
         while not self._stop_event.is_set():
             # ใช้ฟังก์ชันเดิม แต่ตอนนี้มันเช็ก Internet (Wi-Fi หรือ LAN)
@@ -66,7 +65,6 @@ class NetworkMonitor(threading.Thread):
                     # ใช้ Devicestatus.setstatus(id, status)
                     result = self.device_status_updater.setstatus(self.id, current_db_status)
                     self.ui_callback(is_connected) 
-                    print(result)
                     # ตรวจสอบว่าการอัปเดตสำเร็จหรือไม่ (ตรวจสอบจาก result ที่ไม่เป็น None)
                     if result is not None:
                         self.last_status = current_db_status
@@ -84,7 +82,7 @@ class NetworkMonitor(threading.Thread):
             # รอตามช่วงเวลาที่กำหนด
             self._stop_event.wait(self.monitor_interval)
         
-        print("🛑 Network Monitor Thread Stopped.")
+
 
     def stop(self):
         """ส่งสัญญาณให้ thread หยุดการทำงาน"""

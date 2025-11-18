@@ -22,9 +22,11 @@ import requests
 #import pywinstyles
 
 
+
 # nodel การเเจ้งเตือน
 from lib.alert import sendtoTelegram,sendtoLine
 from lib.loadenv import PATH
+from lib.call import press_sos_automation
 
 # model อ่านออกเสียง
 from gtts import gTTS 
@@ -441,6 +443,20 @@ class HomePage(ctk.CTkFrame):
                                        fg_color="#8acaef", text_color="white")
         self.time_label.place(x=360, y=185)
 
+        self.call_button = ctk.CTkButton(
+            self,
+            text="วิดีโอคอล",
+            font=("TH Sarabun New", 20, "bold"),
+            fg_color="#a83242",
+            hover_color="#2D6A4F",
+            text_color="white",
+            corner_radius=8,
+            width=60,  # เพิ่มความกว้างให้ปุ่ม
+            height=25,
+            command=self.on_video_call_click
+        )
+        self.call_button.place(x=500, y=185)
+
         # สร้างส่วนแสดงข้อมูลการตั้งค่ายา
         self.create_medication_display()
 
@@ -457,7 +473,6 @@ class HomePage(ctk.CTkFrame):
         battery_image = Image.open(f"{PATH}imgNew/battery.png").resize((30, 30), Image.Resampling.LANCZOS)
         self.battery_photo = ImageTk.PhotoImage(battery_image)
         battery_label = ctk.CTkLabel(self, image=self.battery_photo, text="", bg_color="#8acaef")
-        #pywinstyles.set_opacity(battery_label, value=1,color="#000001")
         battery_label.place(x=925, y=55)
 
         wifi_image = Image.open(f"{PATH}imgNew/wi-fi.png").resize((30, 30), Image.Resampling.LANCZOS)
@@ -1347,6 +1362,13 @@ class HomePage(ctk.CTkFrame):
                     text_color="#9E9E9E",    # สีเทา
                     border_color="#BDBDBD"   # สีเทา
                 )
+            if hasattr(self, 'call_button'):
+                self.call_button.configure(
+                    state="disabled",
+                    fg_color="#E0E0E0",
+                    hover_color="#E0E0E0",
+                    text_color="#9E9E9E"
+                )
         else:
             # --- เน็ตออนไลน์: คืนค่าปุ่มเป็นปกติ ---
             print("HomePage: Network is ONLINE, enabling buttons.")
@@ -1360,6 +1382,61 @@ class HomePage(ctk.CTkFrame):
                         text_color=style['text_color'],
                         border_color=style['border_color']
                     )
+            if hasattr(self, 'call_button') :
+                self.call_button.configure(
+                    state="normal",
+                    fg_color="#E0E0E0",
+                    hover_color="#E0E0E0",
+                    text_color="#9E9E9E"
+                )
+
+    def on_video_call_click(self):
+        
+        if self.controller.network_status_var.get() == "offline":
+             return 
+
+
+
+        try:
+            token = self.controller.user['token_line']
+            group_id = self.controller.user['group_id']
+
+           
+            if not token or not group_id:
+                print("Call Error: Missing Token or Group ID")
+                self.controller.notifier.show_notification("ยังไม่ได้ตั้งค่า LINE Notify", success=False)
+                return
+                
+            # 4. แสดง Loading (ถูกต้อง)
+            self.controller.show_loading("กำลังเริ่มวิดีโอคอล...", "กรุณารอสักครู่")
+
+            def call_thread():
+                try:
+                    send_status = press_sos_automation(token, group_id)
+                    if send_status: 
+                        self.controller.after(0, lambda: self.controller.notifier.show_notification("ส่งคำขอวิดีโอคอลแล้ว", success=True))
+                    else:
+                        self.controller.after(0, lambda: self.controller.notifier.show_notification("ส่งคำขอ LINE ล้มเหลว", success=False))
+                except Exception as e:
+                    print(f"Failed to run SOS automation thread: {e}")
+                    self.controller.after(0, lambda: self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False))
+                finally:
+                  
+                    self.controller.after(0, self.controller.hide_loading)
+            
+
+            threading.Thread(target=call_thread, daemon=True).start()
+        
+        except KeyError:
+            print("Call Error: 'user', 'token_line', or 'group_id' not found in controller.")
+            self.controller.notifier.show_notification("เกิดข้อผิดพลาด: ไม่พบข้อมูลผู้ใช้", success=False)
+            self.controller.hide_loading() 
+            
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
+            self.controller.hide_loading() 
+
 class Frame2(ctk.CTkFrame): 
     def on_show(self):
         print("Frame2 is now visible")
@@ -4691,9 +4768,12 @@ class MainApp(ctk.CTk):
 
   
     def _medications_worker_thread(self, show_loading_screen, on_complete_callback):
-
+        """Worker ที่รันใน Background Thread สำหรับ fetch_medications"""
+        
+        # ⭐️ [แก้ไข] เราจะไม่เช็ก network_status_var ที่นี่ ⭐️
         new_data = []
         error_message = None
+        data_source = ""
 
         try:
             # ⭐️ [FIX] 1. "พยายาม" ดึงข้อมูลจากเซิร์ฟเวอร์ก่อนเสมอ ⭐️
@@ -4705,6 +4785,7 @@ class MainApp(ctk.CTk):
             # --- 2. ถ้าดึงข้อมูลสำเร็จ (ONLINE) ---
             if medicine_data['status']:
                 new_data = medicine_data['Data']
+                data_source = "Server (Online)"
                 
                 # 2a. บันทึกข้อมูลใหม่ลงไฟล์แคช (JSON)
                 try:
@@ -4735,9 +4816,9 @@ class MainApp(ctk.CTk):
         
         # --- 5. สรุปผลและแสดงผล ---
         
-        # อัปเดตแคช "global" ใน MainApp
+        # ⭐️ [FIX] อัปเดตแคช global *ก่อน* ที่จะไปโหลดจากแคช
         with self.medicine_data_lock:
-            self.cached_medications = new_data
+             self.cached_medications = new_data
         
         if error_message:
             # --- 5a. ถ้าเกิด Error (Onlineล่ม หรือ Offline) -> ให้โหลดจากแคช ---
@@ -4761,15 +4842,15 @@ class MainApp(ctk.CTk):
                 print(f"Meds: ไม่พบไฟล์แคช {self.MEDICINE_CACHE_FILE}")
                 self.after(0, lambda: self.notifier.show_notification("Offline และไม่พบไฟล์แคชข้อมูลยา", success=False))
         
-
+        # 6. เรียก Callback (เช่น Frame2.refresh_medications)
         if on_complete_callback:
             self.after(0, on_complete_callback)
             
-
+        # 7. ซ่อนหน้า Loading (ถ้าถูกเรียกให้แสดง)
         if show_loading_screen:
             self.after(0, self.hide_loading)
             
-
+        # 8. ปลดล็อกสถานะ "กำลังโหลด"
         self._is_med_cache_loading = False
     def _async_update_wifi_status(self, is_connected: bool):
         """
