@@ -443,11 +443,11 @@ class HomePage(ctk.CTkFrame):
                                        fg_color="#8acaef", text_color="white")
         self.time_label.place(x=360, y=185)
 
-        self.call_button = ctk.CTkButton(
+        self.call_button_sos = ctk.CTkButton(
             self,
             text="วิดีโอคอล",
             font=("TH Sarabun New", 20, "bold"),
-            fg_color="#a83242",
+            fg_color="#df1d37",
             hover_color="#2D6A4F",
             text_color="white",
             corner_radius=8,
@@ -455,7 +455,7 @@ class HomePage(ctk.CTkFrame):
             height=25,
             command=self.on_video_call_click
         )
-        self.call_button.place(x=500, y=185)
+        self.call_button_sos.place(x=800, y=185)
 
         # สร้างส่วนแสดงข้อมูลการตั้งค่ายา
         self.create_medication_display()
@@ -5075,8 +5075,9 @@ class MainApp(ctk.CTk):
 
     def start_serial_thread(self):
         try:
-            # กำหนด Port และ Baudrate
-            PORT = "/dev/ttyUSB0"
+            # กำหนด Port และ Baudrate สำหรับเชื่อม UART (TX/RX) กับ Raspberry Pi
+            # /dev/serial0 จะชี้ไปยัง UART หลัก (GPIO14 TXD0, GPIO15 RXD0) บน Pi 5
+            PORT = "/dev/serial0"
             BAUDRATE = 115200
 
             serial_thread = threading.Thread(
