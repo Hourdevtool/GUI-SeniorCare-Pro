@@ -424,6 +424,7 @@ class HomePage(ctk.CTkFrame):
 
         self.menu_buttons = {}
         self.button_original_styles = {}
+        self.call_button_original_style = None
         self._last_checked_network_status = None
 
         # พื้นหลัง (ปรับขนาดเป็น 1024x600)
@@ -437,25 +438,11 @@ class HomePage(ctk.CTkFrame):
         # วันที่และเวลา
         self.date_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 35, "bold"),
                                        fg_color="#8acaef", text_color="white")
-        self.date_label.place(x=70, y=185)
+        self.date_label.place(x=59, y=185)
 
         self.time_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 40, "bold"),
                                        fg_color="#8acaef", text_color="white")
-        self.time_label.place(x=360, y=185)
-
-        self.call_button_sos = ctk.CTkButton(
-            self,
-            text="วิดีโอคอล",
-            font=("TH Sarabun New", 20, "bold"),
-            fg_color="#df1d37",
-            hover_color="#2D6A4F",
-            text_color="white",
-            corner_radius=8,
-            width=60,  # เพิ่มความกว้างให้ปุ่ม
-            height=25,
-            command=self.on_video_call_click
-        )
-        self.call_button_sos.place(x=800, y=185)
+        self.time_label.place(x=365, y=185)
 
         # สร้างส่วนแสดงข้อมูลการตั้งค่ายา
         self.create_medication_display()
@@ -474,12 +461,41 @@ class HomePage(ctk.CTkFrame):
         self.battery_photo = ImageTk.PhotoImage(battery_image)
         battery_label = ctk.CTkLabel(self, image=self.battery_photo, text="", bg_color="#8acaef")
         battery_label.place(x=925, y=55)
-
-        wifi_image = Image.open(f"{PATH}imgNew/wi-fi.png").resize((30, 30), Image.Resampling.LANCZOS)
-        self.wifi_photo = ImageTk.PhotoImage(wifi_image)
-        wifi_label = ctk.CTkLabel(self, image=self.wifi_photo, text="", bg_color="#8acaef")
-        #s.set_opacity(wifi_label, value=1,color="#000001")
-        wifi_label.place(x=845, y=55)
+        
+        # ปรับปรุงปุ่ม SOS ให้สวยงามขึ้น
+        call_button = Image.open(f"{PATH}imgNew/sos.png").resize((70, 70), Image.Resampling.LANCZOS)
+        self.call_photo = ImageTk.PhotoImage(call_button)
+        
+        # สีสำหรับปุ่ม SOS - สีแดง SOS ที่สวยงาม
+        sos_fg_color = "#FF3B30"  # สีแดงสดใส
+        sos_hover_color = "#FF1744"  # สีแดงเข้มขึ้นเมื่อ hover
+        sos_bg_color = "#8acaef"
+        
+        self.call_button = ctk.CTkButton(
+            self, 
+            image=self.call_photo, 
+            text="",
+            bg_color=sos_bg_color,
+            fg_color=sos_fg_color,
+            hover_color=sos_hover_color,
+            width=75,
+            corner_radius=20,  # มุมโค้งมากขึ้น
+            height=75,
+            border_width=3,
+            border_color="#FFFFFF",  # เส้นขอบสีขาว
+            command=self.on_video_call_click
+        )
+        self.call_button.place(x=820, y=30)
+        
+        # บันทึกสไตล์เดิมของปุ่ม SOS
+        self.call_button_original_style = {
+            'fg_color': sos_fg_color,
+            'hover_color': sos_hover_color,
+            'bg_color': sos_bg_color,
+            'border_color': "#FFFFFF",
+            'border_width': 3,
+            'state': 'normal'
+        } 
 
     def create_menu_buttons(self, controller):
         # ปรับขนาดปุ่มให้เล็กลง
@@ -1339,56 +1355,64 @@ class HomePage(ctk.CTkFrame):
             # print(f"Error reading network status: {e}")
             return
 
-
+        # ⭐️ แก้ไข: ตรวจสอบและอัปเดตปุ่มทุกครั้งที่เรียกใช้ (ไม่ใช่แค่เมื่อสถานะเปลี่ยน)
+        # เพื่อแก้บั๊กที่ปุ่มกลับเป็นสีปกติเมื่อกลับจากหน้าอื่น
+        should_update = True
         if current_status == self._last_checked_network_status:
-            return # ถ้าสถานะเดิม ไม่ต้องทำอะไร
+            # ถ้าสถานะเดิม แต่ปุ่มอาจถูก reset ไปแล้ว ให้อัปเดตใหม่
+            should_update = True
         
-        
-        self._last_checked_network_status = current_status
+        if should_update:
+            self._last_checked_network_status = current_status
 
-        if current_status == "offline":
-          
-            print("HomePage: Network is OFFLINE, disabling buttons.")
-            skip = [1,5,6]
-            for i, btn in self.menu_buttons.items():
-                
-                if i in skip : 
-                    continue 
-                
-                btn.configure(
-                    state="disabled",
-                    fg_color="#E0E0E0",      # สีเทา
-                    hover_color="#E0E0E0",     # สีเทา
-                    text_color="#9E9E9E",    # สีเทา
-                    border_color="#BDBDBD"   # สีเทา
-                )
-            if hasattr(self, 'call_button'):
-                self.call_button.configure(
-                    state="disabled",
-                    fg_color="#E0E0E0",
-                    hover_color="#E0E0E0",
-                    text_color="#9E9E9E"
-                )
-        else:
-            # --- เน็ตออนไลน์: คืนค่าปุ่มเป็นปกติ ---
-            print("HomePage: Network is ONLINE, enabling buttons.")
-            for i, btn in self.menu_buttons.items():
-                if i in self.button_original_styles:
-                    style = self.button_original_styles[i]
+            if current_status == "offline":
+                print("HomePage: Network is OFFLINE, disabling buttons.")
+                skip = [1,5,6]
+                for i, btn in self.menu_buttons.items():
+                    
+                    if i in skip : 
+                        continue 
+                    
                     btn.configure(
-                        state="normal",
+                        state="disabled",
+                        fg_color="#E0E0E0",      # สีเทา
+                        hover_color="#E0E0E0",     # สีเทา
+                        text_color="#9E9E9E",    # สีเทา
+                        border_color="#BDBDBD"   # สีเทา
+                    )
+                # อัปเดตปุ่ม SOS ให้เป็นสีเทาเมื่อออฟไลน์
+                if hasattr(self, 'call_button') and self.call_button:
+                    self.call_button.configure(
+                        state="disabled",
+                        fg_color="#B0B0B0",  # สีเทาอ่อน
+                        hover_color="#B0B0B0",  # สีเทาอ่อน
+                        border_color="#9E9E9E",  # เส้นขอบเทา
+                        bg_color="#8acaef"  # เก็บ bg_color เดิม
+                    )
+            else:
+                # --- เน็ตออนไลน์: คืนค่าปุ่มเป็นปกติ ---
+                print("HomePage: Network is ONLINE, enabling buttons.")
+                for i, btn in self.menu_buttons.items():
+                    if i in self.button_original_styles:
+                        style = self.button_original_styles[i]
+                        btn.configure(
+                            state="normal",
+                            fg_color=style['fg_color'],
+                            hover_color=style['hover_color'],
+                            text_color=style['text_color'],
+                            border_color=style['border_color']
+                        )
+                # คืนค่าปุ่ม SOS เป็นสไตล์เดิม
+                if hasattr(self, 'call_button') and self.call_button and self.call_button_original_style:
+                    style = self.call_button_original_style
+                    self.call_button.configure(
+                        state=style['state'],
                         fg_color=style['fg_color'],
                         hover_color=style['hover_color'],
-                        text_color=style['text_color'],
-                        border_color=style['border_color']
+                        bg_color=style['bg_color'],
+                        border_color=style['border_color'],
+                        border_width=style['border_width']
                     )
-            if hasattr(self, 'call_button') :
-                self.call_button.configure(
-                    state="normal",
-                    fg_color="#E0E0E0",
-                    hover_color="#E0E0E0",
-                    text_color="#9E9E9E"
-                )
 
     def on_video_call_click(self):
         

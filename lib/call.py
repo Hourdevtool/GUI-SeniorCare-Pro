@@ -31,8 +31,6 @@ def press_sos_automation(token, group_id): # (แก้ typo gruop_id -> group_i
     try:
         # 1. ตั้งค่า Selenium (เหมือนเดิม)
         options = Options() 
-        options.set_preference("media.navigator.permission.disabled", True)
-        options.set_preference("media.navigator.streams.fake", True)
         
         driver = webdriver.Firefox(options=options)
         
@@ -72,7 +70,7 @@ def press_sos_automation(token, group_id): # (แก้ typo gruop_id -> group_i
         driver.maximize_window()
 
         # 7. ตั้งค่าตัวแปรสำหรับเฝ้าระวัง
-        timeout_seconds = 300 # 5 นาที
+        timeout_seconds = 120 # 5 นาที
         is_alone = True # ⭐️ เริ่มต้นด้วยสถานะ "อยู่คนเดียว" (เพราะเราเพิ่งเข้า)
         alone_start_time = time.time() # ⭐️ เริ่มจับเวลา 5 นาที "ทันที"
 
@@ -90,8 +88,7 @@ def press_sos_automation(token, group_id): # (แก้ typo gruop_id -> group_i
 
                 # 8b. ⭐️ [FIX] "พยายาม" หาปุ่มจำนวนคน
                 # (นี่คือจุดสำคัญ: เราจะไม่ "รอ" แต่จะ "ลองหา")
-                participant_button = driver.find_element(By.CSS_SELECTOR, "div[data-testid='participants-pane-trigger']")
-                
+                participant_button = driver.find_element(By.CLASS_NAME, "css-uczdeo-badge")
                 # 8c. ⭐️ [FIX] ถ้าหาเจอ = เราอยู่ในห้องประชุมแล้ว ให้อ่านค่า
                 label_text = participant_button.get_attribute("aria-label")   
                 count_str = label_text.split('(')[-1].split(')')[0]
