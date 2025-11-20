@@ -1,8 +1,6 @@
-# from server.Database import Database
+
 import requests
 class auth :
-    # def __init__(self):
-    #     self.database = Database()
 
     def checkuser(self,identifier): 
         url = 'http://medic.ctnphrae.com/php/api/auth.php'
@@ -19,15 +17,7 @@ class auth :
              print(errormsg)
              return False
 
-# ----------------  lib ตัวทดสอบ-----------------------------
-        # sql = '''SELECT user.*,tb_device.* 
-        #          FROM user 
-        #          LEFT JOIN tb_device 
-        #          ON user.id = tb_device.id 
-        #          WHERE user.email = %s OR user.phone = %s '''
-        # self.database.cursor.execute(sql,(identifier,identifier))
-        # return self.database.cursor.fetchone();
-# ----------------  lib ตัวทดสอบ-----------------------------
+
     def login(self,identifier,password):
         user = self.checkuser(identifier)
         if not user:

@@ -1,11 +1,10 @@
-# from server.Database import Database
-# from mysql.connector import Error
+
 from server.gemini import Gemini
 from datetime import datetime
 import requests
 class heart_report:
     def __init__(self):
-        # self.Database = Database()
+
         self.gemini = Gemini()
 
     def get_heart_data(self, id):
@@ -35,15 +34,7 @@ class heart_report:
             return result['message']
         else:
             return result['message']
-        # ------------------------------------ lib ทดสอบ ------------------------------------------
-        # try:
-        #     sql = 'SELECT heart_id, systolic_pressure, diastolic_pressure, pulse_rate FROM tb_heart WHERE id = %s ORDER BY date DESC'
-        #     self.Database.cursor.execute(sql, (id,))
-        #     Data = self.Database.cursor.fetchall()
-        #     return {'status': True, 'Data': Data}
-        # except Error as e:
-        #     return {'status': False, 'message': e}
-        # ------------------------------------ lib ทดสอบ ------------------------------------------
+        
     def format_heart_data_for_ai(self, data):
         lines = []
         for row in data:

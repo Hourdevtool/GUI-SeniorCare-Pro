@@ -10,5 +10,4 @@ class SetCounter:
             'count': count
         }
         response = requests.post(url, json=payload)
-        print(response.json())
         countermidecine(count)

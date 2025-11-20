@@ -1,13 +1,10 @@
-# from server.Database import Database
 from google import genai
 from lib.loadenv import API_AI_KEY
-# from mysql.connector import Error
 import re
 import requests
 
 class Gemini:
     def __init__(self):
-        #  self.Database = Database()
          #กำหนด apikey
          self.client = genai.Client(api_key=API_AI_KEY)
     #ฟังชั่นคำเเนะนำ
@@ -82,14 +79,7 @@ class Gemini:
                return  {'status':True,'Advice':Adivce,'message':responseformat['message']} 
              else:
                 return  {'status':False,'message':responseformat['message']}
-# ------------------------------------- lib ทดสอบ ---------------------------------------------
-            #  sql = '''INSERT INTO tb_heart (systolic_pressure,diastolic_pressure,pulse_rate,heart_report,id) VALUES(%s,%s,%s,%s,%s)'''
 
-            #  self.Database.cursor.execute(sql,(Systolic,Diastolic,Pulse,Adivce,id))
-            #  self.Database.conn.commit()
-            
-            #  return {'status':True,'Advice':Adivce,'message':''}   
-# ------------------------------------- lib ทดสอบ ---------------------------------------------
         except:
             return {'status':False,'message':'เกิดข้อผิดพลาดในการประมวลผลคำ'}    
 

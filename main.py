@@ -354,12 +354,15 @@ class login(ctk.CTkFrame):
                     
                     if result['status']:
                         self.controller.user = result['user']
+
+                        self.controller.network_status_var.set("online")
+
+                        self.controller.start_network_monitor_service()
                         with open('user_data.json', 'w', encoding='utf-8') as f:
                             json.dump(result['user'], f, ensure_ascii=False, indent=4, default=default_serializer)
 
                         self.controller.notifier.show_notification(result['message'], success=True)
 
-                        # เปลี่ยนหน้าเมื่อเข้าสู่ระบบสำเร็จ
                         def go_wifi():
                             try:
                                 controller._previous_frame_class = Wificonnect
@@ -1335,28 +1338,21 @@ class HomePage(ctk.CTkFrame):
         
         self.medication_labels.extend([error_card, error_label])
     def check_network_and_update_buttons(self):
-        """
-        ตรวจสอบสถานะเน็ตจาก 'global' (controller) และ
-        อัปเดตสถานะปุ่ม (เทา/กดไม่ได้)
-        """
         current_status = "online" # ค่าเริ่มต้น
         try:
-            # 1. พยายามอ่านจาก ctk.StringVar (วิธีที่แนะนำ)
             current_status = self.controller.network_status_var.get()
+            
+
         except AttributeError:
+            
             try:
-                # 2. ถ้าไม่สำเร็จ ลองอ่านจากตัวแปร String ธรรมดา
                 current_status = self.controller.network_status
-            except AttributeError:
-                # 3. ถ้ายังไม่ถูกสร้าง (เช่น app เพิ่งเปิด) ให้ข้ามไปก่อน
-                # print("Network status variable not yet initialized.")
+            except AttributeError:     
                 return 
         except Exception as e:
             # print(f"Error reading network status: {e}")
             return
-
-        # ⭐️ แก้ไข: ตรวจสอบและอัปเดตปุ่มทุกครั้งที่เรียกใช้ (ไม่ใช่แค่เมื่อสถานะเปลี่ยน)
-        # เพื่อแก้บั๊กที่ปุ่มกลับเป็นสีปกติเมื่อกลับจากหน้าอื่น
+        print(current_status)
         should_update = True
         if current_status == self._last_checked_network_status:
             # ถ้าสถานะเดิม แต่ปุ่มอาจถูก reset ไปแล้ว ให้อัปเดตใหม่
@@ -3928,7 +3924,7 @@ class Report1(ctk.CTkFrame):
             try:
                 self.result = manageData.get(self.userid)
                 result = medicine_report.get_eatmedic(self.userid)
-
+                print(result)
                 if result['status']:
                     self.data = result['data']
                     self.page = 1
@@ -5077,7 +5073,6 @@ class MainApp(ctk.CTk):
                     self.user['device_id'],
                     self.user['id']
                 )
-
                 if new_data and 'data' in new_data:
                     recivetime(new_data['data'])
                 data_changed = False
@@ -5154,7 +5149,9 @@ class MainApp(ctk.CTk):
                 
                 if user_data:
                     self.user = user_data
+                    self.network_status_var.set("online")
                     self.show_frame(HomePage)
+
                 else:
                     self.show_frame(login)
             except Exception as e:
@@ -5164,6 +5161,26 @@ class MainApp(ctk.CTk):
             print("ไม่พบไฟล์ user_data.json - แสดงหน้า login")
             self.show_frame(login)
     
+
+    def start_network_monitor_service(self):
+        if not self.user or 'id' not in self.user:
+            print("❌ Cannot start Network Monitor: No user ID.")
+            return
+
+        if hasattr(self, 'network_monitor') and self.network_monitor.is_alive():
+            print("⚠️ Network Monitor is already running.")
+            return
+
+        try:
+            print(f"✅ Starting Network Monitor for Device ID: {self.user['id']}")
+            self.network_monitor = NetworkMonitor(
+                id=self.user['id'], 
+                ui_callback=self._async_update_wifi_status,
+                monitor_interval=10
+            )
+            self.network_monitor.start()
+        except Exception as e:
+            print(f"❌ Failed to start Network Monitor: {e}")
     def _lift_frame(self, frame_class, call_on_show=True):
         """ยก frame ขึ้นมาแสดง โดยเลือกได้ว่าจะเรียก on_show หรือไม่"""
         try:
