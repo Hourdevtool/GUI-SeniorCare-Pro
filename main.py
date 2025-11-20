@@ -862,9 +862,10 @@ class HomePage(ctk.CTkFrame):
 
     # ฟังก์ชันลดยา
     def reduce_medicine(self, amount=1):
+        current_status = self.controller.network_status_var.get()
         """ลดจำนวนยา"""
         new_count = max(0, self.medicine_count - amount)  # ไม่ให้ต่ำกว่า 0
-        set_counter.update_counter(self.controller.user['device_id'],self.controller.user['id'],new_count)
+        set_counter.update_counter(self.controller.user['device_id'],self.controller.user['id'],new_count,current_status)
         self.update_medicine_count(new_count)
 
     # ฟังก์ชันรีเซ็ตยา
@@ -878,7 +879,8 @@ class HomePage(ctk.CTkFrame):
         
         if response:
             initial_count = 28
-            set_counter.update_counter(self.controller.user['device_id'],self.controller.user['id'],initial_count)
+            current_status = self.controller.network_status_var.get()
+            set_counter.update_counter(self.controller.user['device_id'],self.controller.user['id'],initial_count,current_status)
             self.update_medicine_count(initial_count)
             
             # แสดงข้อความยืนยัน
@@ -4942,8 +4944,10 @@ class MainApp(ctk.CTk):
         QUEUE_FILE = "offline_schedule_queue.json"
         
         if not os.path.exists(QUEUE_FILE):
-            print("Sync: ไม่พบไฟล์คิวออฟไลน์")
             return
+
+
+
 
         # 1. อ่านคิว
         tasks = []
@@ -4954,22 +4958,53 @@ class MainApp(ctk.CTk):
                 print("Sync: ไฟล์คิวว่างเปล่า หรือรูปแบบผิด")
                 os.remove(QUEUE_FILE) # ลบไฟล์ที่ไม่มีข้อมูล
                 return
+            
         except Exception as e:
             print(f"Sync: Error reading queue file: {e}")
             return
             
-        print(f"Sync: พบ {len(tasks)} task ที่ค้างอยู่. เริ่มการซิงค์...")
         
         remaining_tasks = [] # เก็บ task ที่ยังซิงค์ไม่สำเร็จ
         synced_count = 0
 
-        # 2. วนลูป xử lý từng task
         for task in tasks:
             try:
-                # ⭐️ [แก้ไข] ดึง type มาเก็บไว้ก่อน
                 task_type = task.get("type")
                 
-                # --- Task 1: ตั้งค่าวันที่ (โค้ดเดิมของคุณ) ---
+                if task_type == "save_history_eat" and "payload" in task:
+                    payload = task["payload"]
+                    print(f"Sync: กำลังบันทึกประวัติการกินยา... ({payload['medicine_get']})")
+
+                    url = 'http://medic.ctnphrae.com/php/api/save_historyeat.php'
+                    try:
+                        resp = requests.post(url, json=payload, timeout=10)
+                        if resp.status_code == 200:
+                            print(f"Sync: บันทึกประวัติสำเร็จ")
+                            synced_count += 1
+                        else:
+                            print(f"Sync: Server ตอบกลับผิดพลาด ({resp.status_code})")
+                            remaining_tasks.append(task)
+                    except Exception as e:
+                        print(f"Sync: เชื่อมต่อล้มเหลว ({e})")
+                        remaining_tasks.append(task)
+
+                if task_type == "update_counter" and "payload" in task:
+                    payload = task["payload"]
+                    print(f"Sync: กำลังอัปเดตจำนวนยา... ({payload['count']} เม็ด)")
+                    
+                    # ยิง API โดยตรง
+                    url = "http://medic.ctnphrae.com/php/api/updatecounter.php"
+                    try:
+                        resp = requests.post(url, json=payload, timeout=10)
+                        if resp.status_code == 200:
+                            print(f"Sync: อัปเดตจำนวนยาสำเร็จ")
+                            synced_count += 1
+                        else:
+                            print(f"Sync: Server ตอบกลับผิดพลาด ({resp.status_code})")
+                            remaining_tasks.append(task)
+                    except Exception as e:
+                        print(f"Sync: เชื่อมต่อล้มเหลว ({e})")
+                        remaining_tasks.append(task)
                 if task_type == "set_time" and "payload" in task:
                     payload = task["payload"]
                     
