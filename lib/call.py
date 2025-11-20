@@ -59,8 +59,10 @@ def press_sos_automation(token, group_id): # (แก้ typo gruop_id -> group_i
 
         # 5. ส่ง LINE (ทำทันที)
         message = generateflexmessage(call_url)
+
+        print(call_url)
         # ⭐️ [แก้ไข] ใช้ค่าที่ถูกต้องจากตัวแปร
-         
+        
         send_status = sendtoLine(token, group_id, message)
 
         # 6. ย้ายหน้าต่างกลับมาที่หน้าจอ
@@ -70,7 +72,7 @@ def press_sos_automation(token, group_id): # (แก้ typo gruop_id -> group_i
         driver.maximize_window()
 
         # 7. ตั้งค่าตัวแปรสำหรับเฝ้าระวัง
-        timeout_seconds = 120 # 5 นาที
+        timeout_seconds = 120 
         is_alone = True # ⭐️ เริ่มต้นด้วยสถานะ "อยู่คนเดียว" (เพราะเราเพิ่งเข้า)
         alone_start_time = time.time() # ⭐️ เริ่มจับเวลา 5 นาที "ทันที"
 
@@ -86,16 +88,24 @@ def press_sos_automation(token, group_id): # (แก้ typo gruop_id -> group_i
                     print("Browser was closed manually.")
                     break 
 
-                # 8b. ⭐️ [FIX] "พยายาม" หาปุ่มจำนวนคน
-                # (นี่คือจุดสำคัญ: เราจะไม่ "รอ" แต่จะ "ลองหา")
-                participant_button = driver.find_element(By.CLASS_NAME, "css-uczdeo-badge")
-                # 8c. ⭐️ [FIX] ถ้าหาเจอ = เราอยู่ในห้องประชุมแล้ว ให้อ่านค่า
-                label_text = participant_button.get_attribute("aria-label")   
-                count_str = label_text.split('(')[-1].split(')')[0]
-                current_participant_count = int(count_str)
-            except Exception:
+                js_code = """
+                    var videoElements = document.querySelectorAll('.filmstrip__videos .videocontainer');
+                    if (videoElements.length === 0) {
+                        videoElements = document.querySelectorAll('.tile-view-container .videocontainer');
+                    }
+                    return videoElements.length;
+                    """
+                count = driver.execute_script(js_code)
+
+                if isinstance(count, int) and count >= 1:
+                 current_participant_count = count
+                else:
+                    current_participant_count = 1
+            
+                print(f"✅ จำนวนผู้เข้าร่วมที่หาเจอ (Via JS DOM Count): {current_participant_count}")
+            except Exception as e:
                 # 8e. ⭐️ [FIX] ถ้าหาปุ่มไม่เจอ (NoSuchElementException) = เรายังอยู่ใน Lobby
-                print("Lobby detected (participant button not found). Timer continues...")
+                print(f"❌ Error accessing Jitsi API: {e}. Assuming 1 participant.")
                 current_participant_count = 1 # ⭐️ คงสถานะ "อยู่คนเดียว"
             
             # 9. ⭐️ [FIX] ย้าย Logic การจับเวลาและ sleep ให้ออกมาอยู่นอก try/except
@@ -113,7 +123,7 @@ def press_sos_automation(token, group_id): # (แก้ typo gruop_id -> group_i
                     elapsed = time.time() - alone_start_time
                     if elapsed > timeout_seconds:
                         print(f"Alone (or in lobby) for {timeout_seconds} seconds. Closing call.")
-                        break # ⭐️ ออกจากลูปเพื่อปิด
+                        break 
                     else:
                         print(f"Still alone for {int(elapsed)} seconds... (Closing in {int(timeout_seconds - elapsed)}s)")
             else:
