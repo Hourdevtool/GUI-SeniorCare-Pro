@@ -24,7 +24,7 @@ import requests
 
 
 # nodel การเเจ้งเตือน
-from lib.alert import sendtoTelegram,sendtoLine
+from lib.alert import sendtoTelegram, sendtoLine, sendtoLineWithDeduplication
 from lib.loadenv import PATH
 from lib.call import press_sos_automation
 
@@ -429,6 +429,7 @@ class HomePage(ctk.CTkFrame):
         self.button_original_styles = {}
         self.call_button_original_style = None
         self._last_checked_network_status = None
+        self._battery_received = False  # Flag ว่าเคยได้รับค่าแบตเตอรี่จริงหรือยัง
 
         # พื้นหลัง (ปรับขนาดเป็น 1024x600)
         bg_image = Image.open(f"{PATH}image/home.png").resize((1024, 800), Image.Resampling.LANCZOS)
@@ -441,7 +442,7 @@ class HomePage(ctk.CTkFrame):
         # วันที่และเวลา
         self.date_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 35, "bold"),
                                        fg_color="#8acaef", text_color="white")
-        self.date_label.place(x=59, y=185)
+        self.date_label.place(x=80, y=185)
 
         self.time_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 40, "bold"),
                                        fg_color="#8acaef", text_color="white")
@@ -459,20 +460,66 @@ class HomePage(ctk.CTkFrame):
         self.update_datetime()
 
     def add_status_icons(self):
-        # ปรับขนาดไอคอนให้เล็กลง
-        battery_image = Image.open(f"{PATH}imgNew/battery.png").resize((30, 30), Image.Resampling.LANCZOS)
-        self.battery_photo = ImageTk.PhotoImage(battery_image)
-        battery_label = ctk.CTkLabel(self, image=self.battery_photo, text="", bg_color="#8acaef")
-        battery_label.place(x=925, y=55)
+        # โหลดรูปแบตเตอรี่ทั้งหมด
+        battery_size = (60, 60)  # ขนาดรูปแบตเตอรี่
+        self.battery_images = {}
+        battery_levels = [100, 75, 50, 25]
         
-        # ปรับปรุงปุ่ม SOS ให้สวยงามขึ้น
-        call_button = Image.open(f"{PATH}imgNew/sos.png").resize((70, 70), Image.Resampling.LANCZOS)
-        self.call_photo = ImageTk.PhotoImage(call_button)
+        for level in battery_levels:
+            try:
+                battery_image = Image.open(f"{PATH}imgNew/battery-{level}.png").resize(battery_size, Image.Resampling.LANCZOS)
+                self.battery_images[level] = ImageTk.PhotoImage(battery_image)
+            except FileNotFoundError:
+                print(f"Warning: battery-{level}.png not found")
         
-        # สีสำหรับปุ่ม SOS - สีแดง SOS ที่สวยงาม
-        sos_fg_color = "#FF3B30"  # สีแดงสดใส
-        sos_hover_color = "#FF1744"  # สีแดงเข้มขึ้นเมื่อ hover
+        # ใช้รูป default ถ้าไม่มีรูป
+        try:
+            default_image = Image.open(f"{PATH}imgNew/battery.png").resize(battery_size, Image.Resampling.LANCZOS)
+            self.battery_images['default'] = ImageTk.PhotoImage(default_image)
+        except:
+            pass
+        
+        # สร้าง label สำหรับแสดงรูปแบตเตอรี่
+        self.battery_label = ctk.CTkLabel(
+            self, 
+            image=self.battery_images.get(100, self.battery_images.get('default')),
+            text="", 
+            bg_color="#8acaef",
+            fg_color="transparent"
+        )
+        self.battery_label.place(x=830, y=40)
+        
+        self.battery_percent_label = ctk.CTkLabel(
+            self,
+            text="0%",
+            font=("TH Sarabun New", 20, "bold"),
+            text_color="white",
+            bg_color="#8acaef",
+            fg_color="transparent"
+        )
+        self.battery_percent_label.place(x=940, y=70, anchor="center")
+        
+        # เชื่อมต่อกับ battery_percent_var จาก controller
+        if hasattr(self.controller, 'battery_percent_var'):
+            self.controller.battery_percent_var.trace_add('write', self.update_battery_display)
+            # อัพเดตครั้งแรก
+            self.update_battery_display()
+        
+        # โหลดรูป SOS ทั้งสองแบบ (ออนไลน์และออฟไลน์)
+        call_button_online = Image.open(f"{PATH}imgNew/sos.png").resize((60, 60), Image.Resampling.LANCZOS)
+        self.call_photo_online = ImageTk.PhotoImage(call_button_online)
+        
+        call_button_offline = Image.open(f"{PATH}imgNew/sos-offline.png").resize((60, 60), Image.Resampling.LANCZOS)
+        self.call_photo_offline = ImageTk.PhotoImage(call_button_offline)
+        
+        # ใช้รูปออนไลน์เป็นค่าเริ่มต้น
+        self.call_photo = self.call_photo_online
+        
+        # สีสำหรับปุ่ม SOS - ตกแต่งให้สวยงามขึ้น
+        sos_fg_color = "#8acaef"  # สีแดงสดใสสำหรับปุ่ม SOS
+        sos_hover_color = "#8acaef"  # สีแดงเข้มขึ้นเมื่อ hover
         sos_bg_color = "#8acaef"
+        sos_border_color = "#8acaef"  # สีขอบแดงอ่อน
         
         self.call_button = ctk.CTkButton(
             self, 
@@ -481,24 +528,109 @@ class HomePage(ctk.CTkFrame):
             bg_color=sos_bg_color,
             fg_color=sos_fg_color,
             hover_color=sos_hover_color,
-            width=75,
-            corner_radius=20,  # มุมโค้งมากขึ้น
-            height=75,
-            border_width=3,
-            border_color="#FFFFFF",  # เส้นขอบสีขาว
+            width=60,
+            border_width=0,  # เพิ่มขอบให้ดูสวยงาม
+            border_color=sos_border_color,
+            corner_radius=0,  # มุมโค้งมน
+            height=60,
             command=self.on_video_call_click
         )
-        self.call_button.place(x=820, y=30)
+        self.call_button.place(x=700, y=35)
         
         # บันทึกสไตล์เดิมของปุ่ม SOS
         self.call_button_original_style = {
             'fg_color': sos_fg_color,
             'hover_color': sos_hover_color,
             'bg_color': sos_bg_color,
-            'border_color': "#FFFFFF",
-            'border_width': 3,
+            'border_color': sos_border_color,
+            'border_width': 0,
+            'corner_radius': 0,
             'state': 'normal'
         } 
+
+    def update_battery_display(self, *args):
+        """อัพเดตการแสดงผลแบตเตอรี่ตามค่า battery_percent_var"""
+        try:
+            if not hasattr(self.controller, 'battery_percent_var'):
+                return
+            
+            battery_percent = self.controller.battery_percent_var.get()
+            
+            # ตรวจสอบสถานะการเชื่อมต่อ
+            is_connected = True
+            if hasattr(self.controller, 'device_status_var'):
+                device_status = str(self.controller.device_status_var.get())
+                # ตรวจสอบว่ามี error หรือไม่
+                if device_status and ("Error" in device_status or "Disconnected" in device_status or "Waiting" in device_status):
+                    is_connected = False
+            
+            # ตรวจสอบว่ายังไม่ได้รับค่าหรือขาดการเชื่อมต่อ
+            if battery_percent is None:
+                # แสดง "-- %" เมื่อยังไม่ได้รับค่า
+                if hasattr(self, 'battery_percent_label'):
+                    self.battery_percent_label.configure(text="-- %")
+                if hasattr(self, 'battery_label'):
+                    if 'default' in self.battery_images:
+                        self.battery_label.configure(image=self.battery_images['default'])
+                    elif 25 in self.battery_images:
+                        self.battery_label.configure(image=self.battery_images[25])
+                return
+            
+            # แปลงค่าเป็นเปอร์เซ็นต์ (0-100)
+            battery_percent = float(battery_percent)
+            
+            # ถ้าค่าเป็น 0-1 (ทศนิยม) แปลงเป็น 0-100
+            if battery_percent <= 1.0 and battery_percent > 0.0:
+                battery_percent = battery_percent * 100
+                # ตั้ง flag ว่าได้รับค่าจริงแล้ว
+                self._battery_received = True
+            elif battery_percent > 1.0:
+                # ถ้าค่า > 1 แสดงว่าเป็นเปอร์เซ็นต์แล้ว (0-100)
+                # ตั้ง flag ว่าได้รับค่าจริงแล้ว
+                self._battery_received = True
+            
+            # ตรวจสอบว่าค่าเป็น 0.0 จริงๆ หรือยังไม่ได้รับค่า
+            # ถ้าเป็น 0.0 และยังไม่เคยได้รับค่าจริง หรือขาดการเชื่อมต่อ ให้แสดง "-- %"
+            if battery_percent == 0.0:
+                if not self._battery_received or not is_connected:
+                    # แสดง "-- %" เมื่อยังไม่ได้รับค่าหรือขาดการเชื่อมต่อ
+                    if hasattr(self, 'battery_percent_label'):
+                        self.battery_percent_label.configure(text="-- %")
+                    if hasattr(self, 'battery_label'):
+                        if 'default' in self.battery_images:
+                            self.battery_label.configure(image=self.battery_images['default'])
+                        elif 25 in self.battery_images:
+                            self.battery_label.configure(image=self.battery_images[25])
+                    return
+            
+            # จำกัดค่าให้อยู่ในช่วง 0-100
+            battery_percent = max(0, min(100, battery_percent))
+            
+            # เลือกรูปแบตเตอรี่ตามเปอร์เซ็นต์
+            if battery_percent >= 75:
+                battery_image_key = 100
+            elif battery_percent >= 50:
+                battery_image_key = 75
+            elif battery_percent >= 25:
+                battery_image_key = 50
+            else:
+                battery_image_key = 25
+            
+            # อัพเดตรูปแบตเตอรี่
+            if hasattr(self, 'battery_label') and battery_image_key in self.battery_images:
+                self.battery_label.configure(image=self.battery_images[battery_image_key])
+            elif hasattr(self, 'battery_images') and 'default' in self.battery_images:
+                self.battery_label.configure(image=self.battery_images['default'])
+            
+            # อัพเดตเปอร์เซ็นต์ (แสดงเป็นจำนวนเต็ม)
+            if hasattr(self, 'battery_percent_label'):
+                self.battery_percent_label.configure(text=f"{int(battery_percent)}%")
+                
+        except Exception as e:
+            print(f"Error updating battery display: {e}")
+            # แสดง "-- %" เมื่อเกิด error
+            if hasattr(self, 'battery_percent_label'):
+                self.battery_percent_label.configure(text="-- %")
 
     def create_menu_buttons(self, controller):
         # ปรับขนาดปุ่มให้เล็กลง
@@ -668,6 +800,14 @@ class HomePage(ctk.CTkFrame):
             command=self.reset_and_update
         )
         self.refresh_button.place(x=250, y=8)
+        
+        # บันทึกสไตล์เดิมของปุ่มรีเซ็ต
+        self.refresh_button_original_style = {
+            'fg_color': "#f4b81a",
+            'hover_color': "#2D6A4F",
+            'text_color': "white",
+            'state': 'normal'
+        }
 
         self.setting_button = ctk.CTkButton(
             header_frame,
@@ -682,6 +822,14 @@ class HomePage(ctk.CTkFrame):
             command=lambda: self.update_medication_info()
         )
         self.setting_button.place(x=160, y=8)
+        
+        # บันทึกสไตล์เดิมของปุ่มรีเฟรช
+        self.setting_button_original_style = {
+            'fg_color': "#007BFF",
+            'hover_color': "#0056B3",
+            'text_color': "white",
+            'state': 'normal'
+        }
 
         # สร้างกรอบสำหรับแสดงรายการยา
         self.medication_list_frame = ctk.CTkScrollableFrame(
@@ -790,6 +938,14 @@ class HomePage(ctk.CTkFrame):
             command=self.reset_medicine_count  # เอา lambda ออก
         )
         self.reset_counter_button.place(x=200, y=8)
+        
+        # บันทึกสไตล์เดิมของปุ่มรีเซ็ตจำนวนยา
+        self.reset_counter_button_original_style = {
+            'fg_color': "#f4b81a",
+            'hover_color': "#2D6A4F",
+            'text_color': "white",
+            'state': 'normal'
+        }
 
         self.medicine_title = ctk.CTkLabel(
             header_frame,
@@ -1378,14 +1534,40 @@ class HomePage(ctk.CTkFrame):
                         text_color="#9E9E9E",    # สีเทา
                         border_color="#BDBDBD"   # สีเทา
                     )
-                # อัปเดตปุ่ม SOS ให้เป็นสีเทาเมื่อออฟไลน์
+                # อัปเดตปุ่ม SOS ให้เป็นสีเทาและเปลี่ยนรูปเป็นออฟไลน์
                 if hasattr(self, 'call_button') and self.call_button:
                     self.call_button.configure(
                         state="disabled",
+                        image=self.call_photo_offline,  # เปลี่ยนรูปเป็นออฟไลน์
                         fg_color="#B0B0B0",  # สีเทาอ่อน
                         hover_color="#B0B0B0",  # สีเทาอ่อน
                         border_color="#9E9E9E",  # เส้นขอบเทา
                         bg_color="#8acaef"  # เก็บ bg_color เดิม
+                    )
+                
+                # อัปเดตปุ่มรีเฟรชและรีเซ็ตให้เป็นสีเทาและกดไม่ได้
+                if hasattr(self, 'setting_button') and self.setting_button:
+                    self.setting_button.configure(
+                        state="disabled",
+                        fg_color="#E0E0E0",
+                        hover_color="#E0E0E0",
+                        text_color="#9E9E9E"
+                    )
+                
+                if hasattr(self, 'refresh_button') and self.refresh_button:
+                    self.refresh_button.configure(
+                        state="disabled",
+                        fg_color="#E0E0E0",
+                        hover_color="#E0E0E0",
+                        text_color="#9E9E9E"
+                    )
+                
+                if hasattr(self, 'reset_counter_button') and self.reset_counter_button:
+                    self.reset_counter_button.configure(
+                        state="disabled",
+                        fg_color="#E0E0E0",
+                        hover_color="#E0E0E0",
+                        text_color="#9E9E9E"
                     )
             else:
                 # --- เน็ตออนไลน์: คืนค่าปุ่มเป็นปกติ ---
@@ -1400,16 +1582,46 @@ class HomePage(ctk.CTkFrame):
                             text_color=style['text_color'],
                             border_color=style['border_color']
                         )
-                # คืนค่าปุ่ม SOS เป็นสไตล์เดิม
+                # คืนค่าปุ่ม SOS เป็นสไตล์เดิมและเปลี่ยนรูปกลับเป็นออนไลน์
                 if hasattr(self, 'call_button') and self.call_button and self.call_button_original_style:
                     style = self.call_button_original_style
                     self.call_button.configure(
                         state=style['state'],
+                        image=self.call_photo_online,  # เปลี่ยนรูปกลับเป็นออนไลน์
                         fg_color=style['fg_color'],
                         hover_color=style['hover_color'],
                         bg_color=style['bg_color'],
                         border_color=style['border_color'],
-                        border_width=style['border_width']
+                        border_width=style['border_width'],
+                        corner_radius=style.get('corner_radius', 0)
+                    )
+                
+                # คืนค่าปุ่มรีเฟรชและรีเซ็ตเป็นสไตล์เดิม
+                if hasattr(self, 'setting_button') and self.setting_button and hasattr(self, 'setting_button_original_style'):
+                    style = self.setting_button_original_style
+                    self.setting_button.configure(
+                        state=style['state'],
+                        fg_color=style['fg_color'],
+                        hover_color=style['hover_color'],
+                        text_color=style['text_color']
+                    )
+                
+                if hasattr(self, 'refresh_button') and self.refresh_button and hasattr(self, 'refresh_button_original_style'):
+                    style = self.refresh_button_original_style
+                    self.refresh_button.configure(
+                        state=style['state'],
+                        fg_color=style['fg_color'],
+                        hover_color=style['hover_color'],
+                        text_color=style['text_color']
+                    )
+                
+                if hasattr(self, 'reset_counter_button') and self.reset_counter_button and hasattr(self, 'reset_counter_button_original_style'):
+                    style = self.reset_counter_button_original_style
+                    self.reset_counter_button.configure(
+                        state=style['state'],
+                        fg_color=style['fg_color'],
+                        hover_color=style['hover_color'],
+                        text_color=style['text_color']
                     )
 
     def on_video_call_click(self):
@@ -3372,7 +3584,7 @@ class MedicationScheduleFrame(ctk.CTkFrame):
         # ปุ่มเปิดปฏิทินแบบสวย
         pick_date_btn = ctk.CTkButton(
             frame_date, text="เลือกวัน", width=140, height=55,
-            font=("TH Sarabun New", 15, "bold"), corner_radius=8,
+            font=("TH Sarabun New", 20, "bold"), corner_radius=8,
             fg_color="#0077b6", hover_color="#023e8a",
             border_width=2, border_color="#023e8a"
         )
@@ -5134,13 +5346,70 @@ class MainApp(ctk.CTk):
             PORT = "/dev/serial0"
             BAUDRATE = 115200
 
+            # สร้าง callback function เพื่อตรวจสอบจำนวนยาคงเหลือ
+            def get_medicine_count():
+                """Callback function ที่คืนค่าจำนวนยาคงเหลือ"""
+                try:
+                    if hasattr(self, 'user') and self.user:
+                        count = self.user.get('count_medicine')
+                        if count is not None:
+                            return int(count)
+                except Exception as e:
+                    print(f"Error getting medicine count: {e}")
+                return None
+
+            # สร้าง callback function สำหรับแจ้งเตือน LINE
+            def notification_callback(notification_type, identifier, message):
+                """
+                Callback function สำหรับแจ้งเตือนผ่าน LINE และบันทึกประวัติการจ่ายยา
+                
+                Args:
+                    notification_type: ประเภทการแจ้งเตือน (เช่น "cmd_success", "cmd_failed", "save_history_failed")
+                    identifier: ตัวระบุเพิ่มเติม (เช่น schedule_time, command_id)
+                    message: ข้อความที่จะส่ง (None ถ้าเป็น flag สำหรับบันทึกประวัติ)
+                """
+                try:
+                    # ตรวจสอบว่าต้องบันทึกประวัติการจ่ายยาหรือไม่
+                    if notification_type == "save_history_failed":
+                        # บันทึกประวัติการจ่ายยาล้มเหลว
+                        self._save_medicine_history("failed")
+                        return
+                    
+                    if not hasattr(self, 'user') or not self.user:
+                        print("[Notification] ไม่สามารถส่งแจ้งเตือน: ยังไม่มีข้อมูลผู้ใช้")
+                        return
+                    
+                    line_token = self.user.get('token_line')
+                    line_group = self.user.get('group_id')
+                    
+                    if not line_token or not line_group:
+                        print("[Notification] ไม่สามารถส่งแจ้งเตือน: ไม่มี LINE Token หรือ Group ID")
+                        return
+                    
+                    # ถ้า message เป็น None ให้ข้ามการส่ง LINE
+                    if message is None:
+                        return
+                    
+                    # ส่งข้อความผ่าน LINE พร้อมป้องกันการส่งซ้ำ
+                    sendtoLineWithDeduplication(
+                        token=line_token,
+                        group_id=line_group,
+                        message_data=message,
+                        notification_type=notification_type,
+                        identifier=identifier
+                    )
+                except Exception as e:
+                    print(f"[Notification] เกิดข้อผิดพลาดขณะส่งแจ้งเตือน: {e}")
+
             serial_thread = threading.Thread(
                 target=start_Serial_loop, 
                 args=(
                     PORT, 
                     BAUDRATE, 
                     self.battery_percent_var, 
-                    self.device_status_var    
+                    self.device_status_var,
+                    5.0,  # request_interval
+                    notification_callback  # notification_callback
                 ),
                 daemon=True 
             )
@@ -5148,27 +5417,161 @@ class MainApp(ctk.CTk):
         except Exception as e:
             print(f"--- [MainApp] FAILED to start serial thread: {e} ---")
             self.device_status_var.set(f"Serial Error: {e}")
+    def _get_medicines_for_current_time(self):
+        """
+        ดึง medicine_id จาก schedule ที่ตรงกับเวลาปัจจุบัน
+        
+        Returns:
+            list: array ของ medicine_id (สูงสุด 4 ตัว) หรือ [] ถ้าไม่พบ
+        """
+        try:
+            # ตรวจสอบว่ามีข้อมูล schedule หรือไม่
+            if not hasattr(self, 'last_known_schedule_data') or not self.last_known_schedule_data:
+                # ลองโหลดจาก cache
+                CACHE_FILE = "time_data.json"
+                if os.path.exists(CACHE_FILE):
+                    try:
+                        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                            schedule_data = json.load(f)
+                            if schedule_data:
+                                self.last_known_schedule_data = {'data': schedule_data}
+                    except Exception as e:
+                        print(f"Error loading schedule cache: {e}")
+                        return []
+                else:
+                    return []
+            
+            # ดึงข้อมูล schedule
+            meal_data = self.last_known_schedule_data
+            if not meal_data or 'data' not in meal_data:
+                return []
+            
+            # สร้าง reverse map จากชื่อยาไป medicine_id
+            medicine_name_to_id = {}
+            if hasattr(self, 'cached_medications') and self.cached_medications:
+                with self.medicine_data_lock:
+                    for med in self.cached_medications:
+                        if 'medicine_name' in med and 'medicine_id' in med:
+                            medicine_name_to_id[med['medicine_name']] = med['medicine_id']
+            
+            if not medicine_name_to_id:
+                print("[Save History] ไม่พบข้อมูลยาใน cached_medications")
+                return []
+            
+            # หา schedule ที่ตรงกับเวลาปัจจุบัน
+            now = datetime.now()
+            current_time_str = now.strftime("%H:%M")
+            
+            medications = meal_data['data']
+            medicine_ids = []
+            
+            for med in medications:
+                schedule_time = med.get('time', '')
+                if not schedule_time:
+                    continue
+                
+                # เปรียบเทียบเวลา (รองรับรูปแบบ HH:MM และ HH:MM:SS)
+                schedule_time_clean = schedule_time.split(':')[:2]  # เอาแค่ HH:MM
+                current_time_clean = current_time_str.split(':')[:2]
+                
+                if schedule_time_clean == current_time_clean:
+                    # พบ schedule ที่ตรงกับเวลาปัจจุบัน
+                    # ดึง medicine_id จาก medicine_1 ถึง medicine_4
+                    for i in range(1, 5):
+                        med_name = med.get(f'medicine_{i}', '')
+                        if med_name and med_name in medicine_name_to_id:
+                            medicine_ids.append(medicine_name_to_id[med_name])
+                    
+                    # หาเจอแล้ว ให้ return
+                    break
+            
+            return medicine_ids[:4]  # จำกัดสูงสุด 4 ตัว
+            
+        except Exception as e:
+            print(f"[Save History] Error getting medicines for current time: {e}")
+            return []
+    
+    def _save_medicine_history(self, medicine_get):
+        """
+        บันทึกประวัติการจ่ายยาลงฐานข้อมูล
+        
+        Args:
+            medicine_get: "success" หรือ "failed"
+        """
+        try:
+            if not hasattr(self, 'user') or not self.user:
+                print("[Save History] ไม่พบข้อมูลผู้ใช้")
+                return
+            
+            # ดึงข้อมูลที่จำเป็น
+            device_id = self.user.get('device_id')
+            user_id = self.user.get('id')
+            
+            if not device_id or not user_id:
+                print("[Save History] ไม่พบ device_id หรือ id")
+                return
+            
+            # ดึง medicine_id จาก schedule ที่ตรงกับเวลาปัจจุบัน
+            medicines = self._get_medicines_for_current_time()
+            
+            if not medicines:
+                print("[Save History] ไม่พบข้อมูลยาสำหรับเวลาปัจจุบัน")
+                return
+            
+            # ตรวจสอบ network status
+            network_status = self.network_status_var.get()
+            status_param = "online" if network_status == "online" else None
+            
+            # เรียกใช้ save_history_eat
+            result = medicine_report.save_history_eat(
+                device_id=device_id,
+                medicines=medicines,
+                id=user_id,
+                medicine_get=medicine_get,
+                status=status_param
+            )
+            
+            if result and result.get('status'):
+                print(f"[Save History] บันทึกประวัติการจ่ายยา ({medicine_get}) สำเร็จ")
+            else:
+                message = result.get('message', 'Unknown error') if result else 'No result'
+                print(f"[Save History] บันทึกประวัติการจ่ายยา ({medicine_get}) ล้มเหลว: {message}")
+                
+        except Exception as e:
+            print(f"[Save History] เกิดข้อผิดพลาดขณะบันทึกประวัติ: {e}")
+
     # อัพเดตสถานะการจ่ายยา
     def status_callback(self,*args):
         new_status = self.device_status_var.get()
         current_time = time.time()
-
+        
+        # เก็บ timestamp ของ status ต่างๆ
+        if not hasattr(self, 'status_timestamps'):
+            self.status_timestamps = {}
+        
+        self.status_timestamps[new_status] = current_time
 
         if new_status == "1":
-
-            if '0' in self.status_timestamps['0']:
-                time_state = self.status_timestamps['0']
-                duration = current_time -time_state
-
-                duration_minutes = duration /60
+            # จ่ายยาสำเร็จ
+            if '0' in self.status_timestamps:
+                time_state = self.status_timestamps.get('0', current_time)
+                duration = current_time - time_state
+                duration_minutes = duration / 60
             
-            if duration_minutes > self.user['alert_delay']:
-                print(f"!!! test !!! (Duration {duration:.0f}s > {self.alert_delay}s)")
+            if '0' in self.status_timestamps and duration_minutes > self.user.get('alert_delay', 0):
+                print(f"!!! test !!! (Duration {duration:.0f}s > {self.user.get('alert_delay', 0)}s)")
             else:
-                print(f"--- ทดสอบ --- (Duration {duration:.0f}s <= {self.alert_delay}s)")
+                print(f"--- ทดสอบ --- (Duration {duration:.0f}s <= {self.user.get('alert_delay', 0)}s)")
 
             homePage = self.frames[HomePage]
             homePage.reduce_medicine()
+            
+            # บันทึกประวัติการจ่ายยาสำเร็จ
+            self._save_medicine_history("success")
+            
+        elif new_status == "0":
+            # จ่ายยาล้มเหลว - จะบันทึกเมื่อ status=0 ติดกัน 5 ครั้ง (จัดการใน serial_handler)
+            print("Status: 0 (จ่ายยาล้มเหลว)")
         else:
             print("Action: OK")
 
