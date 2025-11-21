@@ -489,12 +489,12 @@ class HomePage(ctk.CTkFrame):
         self.battery_percent_label = ctk.CTkLabel(
             self,
             text="0%",
-            font=("TH Sarabun New", 20, "bold"),
-            text_color="white",
+            font=("TH Sarabun New", 28, "bold"),
+            text_color="black",
             bg_color="#8acaef",
             fg_color="transparent"
         )
-        self.battery_percent_label.place(x=940, y=70, anchor="center")
+        self.battery_percent_label.place(x=942, y=70, anchor="center")
         
         # เชื่อมต่อกับ battery_percent_var จาก controller
         if hasattr(self.controller, 'battery_percent_var'):

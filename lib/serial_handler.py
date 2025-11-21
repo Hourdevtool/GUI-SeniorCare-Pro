@@ -39,6 +39,23 @@ def _is_status_payload(data):
     return has_battery and has_status
 
 
+def _normalize_status_value(status):
+    """แปลงค่าที่ได้รับจากบอร์ดให้เป็นสถานะที่ระบบรู้จัก"""
+    if status is None:
+        return None
+
+    status_str = str(status).strip().lower()
+
+    if status_str in {"fail", "complete", "nopush"}:
+        return status_str
+    if status_str == "0":
+        return "fail"
+    if status_str == "1":
+        return "complete"
+
+    return status_str
+
+
 def _parse_schedule_time(time_str):
     """แปลงสตริงเวลาให้เป็น datetime สำหรับตรวจสอบเวลาจ่ายยา"""
     if not time_str:
@@ -336,8 +353,8 @@ def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=Non
     last_payload = None
     last_special_message = None
     last_status_value = None
-    status_zero_count = 0  # นับจำนวนครั้งที่ได้รับ status=0 ติดกัน
-    STATUS_ZERO_THRESHOLD = 5  # จำนวนครั้งที่ต้องได้รับ status=0 ก่อนส่งคำสั่ง cmd=1
+    status_fail_count = 0  # นับจำนวนครั้งที่ได้รับสถานะ fail ติดกัน
+    STATUS_FAIL_THRESHOLD = 5  # จำนวนครั้งที่ต้องได้รับสถานะ fail ก่อนส่งคำสั่ง cmd=1
     command_tolerance_after_sec = 60  # ส่งคำสั่งภายใน 60 วินาทีหลังถึงเวลาที่ตั้งไว้
     command_tolerance_before_sec = 0   # ไม่ส่งก่อนเวลาที่ตั้งไว้
 
@@ -354,9 +371,10 @@ def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=Non
                     # ข้อมูล JSON ที่มี status และ battery
                     battery_level = received_data.get("battery")
                     new_status = received_data.get("status")
+                    normalized_status = _normalize_status_value(new_status)
                     
-                    # ข้ามถ้าข้อมูลเหมือนเดิม (ยกเว้นเมื่อ status=0 เพื่อให้นับได้)
-                    if last_payload == received_data and (new_status is None or str(new_status) != "0"):
+                    # ข้ามถ้าข้อมูลเหมือนเดิม (ยกเว้นเมื่อสถานะเป็น fail เพื่อให้นับได้)
+                    if last_payload == received_data and normalized_status != "fail":
                         continue
 
                     last_payload = received_data.copy()
@@ -369,70 +387,69 @@ def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=Non
                     
                     if new_status is not None:
                         try:
-                            status_str = str(new_status)
-
+                            display_status = str(new_status)
                             if status_var is not None:
-                                status_var.set(status_str)
+                                status_var.set(display_status)
 
                             # ตรวจสอบว่า status เปลี่ยนหรือไม่
-                            status_changed = (last_status_value != status_str)
+                            status_changed = (last_status_value != normalized_status)
                             
-                            # ตรวจสอบและนับ status=0
-                            if status_str == "0":
-                                # ถ้า status เปลี่ยนจากค่าอื่นเป็น 0 ให้เริ่มนับใหม่
+                            # ตรวจสอบและนับสถานะ fail
+                            if normalized_status == "fail":
+                                # ถ้าสถานะเปลี่ยนจากค่าอื่นเป็น fail ให้เริ่มนับใหม่
                                 if status_changed:
-                                    status_zero_count = 1
-                                    print(f"Status changed to 0, starting count: {status_zero_count}/{STATUS_ZERO_THRESHOLD}")
+                                    status_fail_count = 1
+                                    print(f"Status changed to fail, starting count: {status_fail_count}/{STATUS_FAIL_THRESHOLD}")
                                 else:
-                                    # ถ้า status ยังเป็น 0 อยู่ ให้เพิ่มตัวนับ
-                                    status_zero_count += 1
-                                    print(f"Status=0 detected (count: {status_zero_count}/{STATUS_ZERO_THRESHOLD})")
+                                    # ถ้าสถานะยังเป็น fail อยู่ ให้เพิ่มตัวนับ
+                                    status_fail_count += 1
+                                    print(f"Status=fail detected (count: {status_fail_count}/{STATUS_FAIL_THRESHOLD})")
                                 
                                 # เมื่อครบ 5 ครั้งติดกัน ให้ส่งคำสั่ง cmd=1
-                                if status_zero_count >= STATUS_ZERO_THRESHOLD:
+                                if status_fail_count >= STATUS_FAIL_THRESHOLD:
                                     try:
                                         command_data = {"cmd": 1, "message": "init"}
                                         command = json.dumps(command_data) + "\n"
-                                        print(f"TX (cmd=1 after {STATUS_ZERO_THRESHOLD} status=0): {command.strip()}")
+                                        print(f"TX (cmd=1 after {STATUS_FAIL_THRESHOLD} fail): {command.strip()}")
                                         _clear_serial_buffers(ser)
                                         ser.write(command.encode("utf-8"))
                                         ser.flush()
                                         
-                                        # แจ้งเตือน: จ่ายยาไม่สำเร็จ (status=0 ติดกัน 5 ครั้ง)
+                                        # แจ้งเตือน: จ่ายยาไม่สำเร็จ (fail ติดกัน 5 ครั้ง)
                                         if notification_callback:
                                             try:
                                                 message = (
                                                     "⚠️ [SeniorCare Pro] แจ้งเตือน\n\n"
                                                     f"❌ การจ่ายยาล้มเหลว\n"
-                                                    f"สถานะ: ตรวจพบ status=0 ติดกัน {STATUS_ZERO_THRESHOLD} ครั้ง\n"
+                                                    f"สถานะ: ตรวจพบ fail ติดกัน {STATUS_FAIL_THRESHOLD} ครั้ง\n"
                                                     f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                                                     f"ระบบได้ส่งคำสั่ง cmd=1 เพื่อลองจ่ายยาอีกครั้ง"
                                                 )
                                                 notification_callback(
                                                     "cmd_failed",
-                                                    f"status_zero_{STATUS_ZERO_THRESHOLD}",
+                                                    f"status_fail_{STATUS_FAIL_THRESHOLD}",
                                                     message
                                                 )
                                                 # บันทึกประวัติการจ่ายยาล้มเหลว
                                                 notification_callback(
                                                     "save_history_failed",
-                                                    f"status_zero_{STATUS_ZERO_THRESHOLD}",
+                                                    f"status_fail_{STATUS_FAIL_THRESHOLD}",
                                                     None  # ส่ง None เพื่อบอกว่าเป็น flag สำหรับบันทึกประวัติ
                                                 )
                                             except Exception as e:
                                                 print(f"Error sending notification: {e}")
                                         
-                                        status_zero_count = 0  # รีเซ็ตตัวนับหลังจากส่งคำสั่ง
+                                        status_fail_count = 0  # รีเซ็ตตัวนับหลังจากส่งคำสั่ง
                                     except Exception as e:
                                         print(f"Error sending cmd=1 command: {e}")
                             else:
-                                # ถ้า status ไม่ใช่ 0
-                                if status_changed and last_status_value == "0":
-                                    # ส่ง reset_data เมื่อ status เปลี่ยนจาก 0 เป็นค่าอื่น
+                                # ถ้าสถานะไม่ใช่ fail
+                                if status_changed and last_status_value == "fail":
+                                    # ส่ง reset_data เมื่อสถานะเปลี่ยนจาก fail เป็นค่าอื่น
                                     try:
                                         command_data = {"cmd": 1, "message": "reset_data"}
                                         command = json.dumps(command_data) + "\n"
-                                        print(f"TX (reset_data): {command.strip()}")
+                                        print(f"TX (reset_data after fail): {command.strip()}")
                                         _clear_serial_buffers(ser)
                                         ser.write(command.encode("utf-8"))
                                         ser.flush()
@@ -445,44 +462,44 @@ def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=Non
                                             message = (
                                                 "✅ [SeniorCare Pro] แจ้งเตือน\n\n"
                                                 f"✅ การจ่ายยาสำเร็จ\n"
-                                                f"สถานะ: เปลี่ยนจาก 0 เป็น {status_str}\n"
+                                                f"สถานะ: เปลี่ยนจาก fail เป็น {display_status}\n"
                                                 f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                                                 f"ระบบได้จ่ายยาสำเร็จหลังจากที่ล้มเหลวก่อนหน้านี้"
                                             )
                                             notification_callback(
                                                 "cmd_success",
-                                                f"status_recovered_{status_str}",
+                                                f"status_recovered_{display_status}",
                                                 message
                                             )
                                         except Exception as e:
                                             print(f"Error sending recovery notification: {e}")
                                 
-                                # แจ้งเตือนเมื่อ status=1 (จ่ายยาสำเร็จ)
-                                if status_str == "1" and status_changed:
+                                # แจ้งเตือนเมื่อสถานะ complete (จ่ายยาสำเร็จ)
+                                if normalized_status == "complete" and status_changed:
                                     if notification_callback:
                                         try:
                                             message = (
                                                 "✅ [SeniorCare Pro] แจ้งเตือน\n\n"
                                                 f"✅ การจ่ายยาสำเร็จ\n"
-                                                f"สถานะ: {status_str}\n"
+                                                f"สถานะ: {display_status}\n"
                                                 f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                                                 f"ระบบได้จ่ายยาสำเร็จตามปกติ"
                                             )
                                             notification_callback(
                                                 "cmd_success",
-                                                "status_1",
+                                                "status_complete",
                                                 message
                                             )
                                         except Exception as e:
                                             print(f"Error sending success notification: {e}")
                                 
-                                # รีเซ็ตตัวนับเมื่อ status ไม่ใช่ 0
-                                if status_zero_count > 0:
-                                    print(f"Status changed from 0 to {status_str}, resetting count")
-                                    status_zero_count = 0
+                                # รีเซ็ตตัวนับเมื่อสถานะไม่ใช่ fail
+                                if status_fail_count > 0:
+                                    print(f"Status changed from fail to {display_status}, resetting count")
+                                    status_fail_count = 0
                             
                             # อัพเดต last_status_value
-                            last_status_value = status_str
+                            last_status_value = normalized_status
                         except Exception as e:
                             print(f"Error setting status_var: {e}")
                 elif isinstance(received_data, str):
@@ -492,36 +509,6 @@ def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=Non
                     last_special_message = received_data
                     # ข้อความพิเศษจาก ESP32 (เช่น "rehome_sent", "cmd_1_sent", "waiting")
                     print(f"Received special message: {received_data}")
-                    
-                    # แจ้งเตือนเมื่อได้รับข้อความพิเศษ
-                    if notification_callback:
-                        try:
-                            if received_data == "cmd_1_sent":
-                                message = (
-                                    "✅ [SeniorCare Pro] แจ้งเตือน\n\n"
-                                    f"✅ ส่งคำสั่งจ่ายยาสำเร็จ\n"
-                                    f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                                    f"ระบบได้รับยืนยันจากอุปกรณ์ว่าส่งคำสั่งสำเร็จ"
-                                )
-                                notification_callback(
-                                    "cmd_success",
-                                    "cmd_1",
-                                    message
-                                )
-                            elif received_data == "rehome_sent":
-                                message = (
-                                    "✅ [SeniorCare Pro] แจ้งเตือน\n\n"
-                                    f"✅ ส่งคำสั่งรีเซ็ตสำเร็จ\n"
-                                    f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                                    f"ระบบได้รับยืนยันจากอุปกรณ์ว่าส่งคำสั่งรีเซ็ตสำเร็จ"
-                                )
-                                notification_callback(
-                                    "cmd_success",
-                                    "rehome",
-                                    message
-                                )
-                        except Exception as e:
-                            print(f"Error sending notification for special message: {e}")
                     
                     if status_var is not None:
                         try:
