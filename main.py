@@ -18,10 +18,7 @@ from notifier import Notifier
 from network_monitor import NetworkMonitor
 import serial
 import requests
-# --ใหม่--
-#import pywinstyles
-
-
+#
 
 # nodel การเเจ้งเตือน
 from lib.alert import sendtoTelegram, sendtoLine, sendtoLineWithDeduplication
@@ -5346,17 +5343,17 @@ class MainApp(ctk.CTk):
             PORT = "/dev/serial0"
             BAUDRATE = 115200
 
-            # สร้าง callback function เพื่อตรวจสอบจำนวนยาคงเหลือ
-            def get_medicine_count():
-                """Callback function ที่คืนค่าจำนวนยาคงเหลือ"""
-                try:
-                    if hasattr(self, 'user') and self.user:
-                        count = self.user.get('count_medicine')
-                        if count is not None:
-                            return int(count)
-                except Exception as e:
-                    print(f"Error getting medicine count: {e}")
-                return None
+            # # สร้าง callback function เพื่อตรวจสอบจำนวนยาคงเหลือ (ปิดใช้งานชั่วคราว: ยังไม่ถูกใช้)
+            # def get_medicine_count():
+            #     \"\"\"Callback function ที่คืนค่าจำนวนยาคงเหลือ\"\"\"
+            #     try:
+            #         if hasattr(self, 'user') and self.user:
+            #             count = self.user.get('count_medicine')
+            #             if count is not None:
+            #                 return int(count)
+            #     except Exception as e:
+            #         print(f\"Error getting medicine count: {e}\")
+            #     return None
 
             # สร้าง callback function สำหรับแจ้งเตือน LINE
             def notification_callback(notification_type, identifier, message):
