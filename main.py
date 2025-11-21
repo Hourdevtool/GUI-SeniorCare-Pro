@@ -32,12 +32,12 @@ from pygame import mixer
 
 SONG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "song")
 VOICE_PROMPTS = {
-    "complete": {"text": "จ่ายยาสำเร็จ", "filename": "complete.mp3"},
-    "dontpick": {"text": "ผู้ป่วยไม่มารับยา", "filename": "dontpick.mp3"},
-    "fail": {"text": "ดันยาไม่สำเร็จ", "filename": "fail.mp3"},
+    "complete": {"text": "จ่ายยาสำเร็จครับ", "filename": "complete.mp3"},
+    "dontpick": {"text": "ผู้ป่วยกรุณารับยาด้วยครับ", "filename": "dontpick.mp3"},
+    "fail": {"text": "ดันยาไม่สำเร็จครับ", "filename": "fail.mp3"},
 }
 STARTUP_GREETING = {
-    "text": "สวัสดีครับ โฮมแคร์อัจฉริยะพร้อมให้บริการแล้วครับ",
+    "text": "สวัสดีครับโฮมแคร์พร้อมให้บริการครับ",
     "filename": "startup_greeting.mp3",
 }
 
@@ -5749,7 +5749,7 @@ class MainApp(ctk.CTk):
                 else:
                     print(f"--- ทดสอบ --- (Duration {duration:.0f}s <= {alert_delay}m)")
             else:
-                print("Status: complete (จ่ายยาสำเร็จ)")
+                print("Status: complete (จ่ายยาสำเร็จครับ)")
 
             if getattr(self, 'voice_player', None):
                 self.voice_player.play("complete")
@@ -5759,12 +5759,12 @@ class MainApp(ctk.CTk):
             self._save_medicine_history("success")
 
         elif normalized_status == "fail":
-            print("Status: fail (จ่ายยาล้มเหลว)")
+            print("Status: fail (จ่ายยาล้มเหลวครับ)")
             if getattr(self, 'voice_player', None):
                 self.voice_player.play("fail")
 
         elif normalized_status == "nopush":
-            print("Status: nopush (ยังไม่มีการดันยา)")
+            print("Status: nopush (ยังไม่มีการดันยาครับ)")
 
         elif normalized_status:
             print(f"Status update: {normalized_status}")
