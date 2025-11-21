@@ -7,6 +7,7 @@ import threading
 import json
 import os
 import warnings
+import re
 from tkcalendar import Calendar
 from datetime import datetime, timedelta
 from pywifi import PyWiFi
@@ -28,6 +29,98 @@ from lib.call import press_sos_automation
 # model อ่านออกเสียง
 from gtts import gTTS 
 from pygame import mixer
+
+SONG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "song")
+VOICE_PROMPTS = {
+    "complete": {"text": "จ่ายยาสำเร็จ", "filename": "complete.mp3"},
+    "dontpick": {"text": "ผู้ป่วยไม่มารับยา", "filename": "dontpick.mp3"},
+    "fail": {"text": "ดันยาไม่สำเร็จ", "filename": "fail.mp3"},
+}
+STARTUP_GREETING = {
+    "text": "สวัสดีครับ โฮมแคร์อัจฉริยะพร้อมให้บริการแล้วครับ",
+    "filename": "startup_greeting.mp3",
+}
+
+
+class VoicePromptPlayer:
+    def __init__(self, song_dir=SONG_DIR):
+        self.song_dir = song_dir
+        os.makedirs(self.song_dir, exist_ok=True)
+        self._lock = threading.Lock()
+
+    def ensure_startup_greeting(self):
+        """สร้างไฟล์เสียงต้อนรับเมื่อเปิดระบบครั้งแรก"""
+        file_path = os.path.join(self.song_dir, STARTUP_GREETING["filename"])
+        if os.path.exists(file_path):
+            return file_path
+        try:
+            print("[VoicePrompt] Creating startup greeting audio")
+            tts = gTTS(text=STARTUP_GREETING["text"], lang='th')
+            tts.save(file_path)
+        except Exception as e:
+            print(f"[VoicePrompt] Failed to create startup greeting: {e}")
+        return file_path
+
+    def _ensure_file(self, key):
+        data = VOICE_PROMPTS[key]
+        file_path = os.path.join(self.song_dir, data["filename"])
+        if not os.path.exists(file_path):
+            try:
+                print(f"[VoicePrompt] Creating audio for '{data['text']}'")
+                tts = gTTS(text=data["text"], lang='th')
+                tts.save(file_path)
+            except Exception as e:
+                print(f"[VoicePrompt] Failed to create '{key}': {e}")
+                raise
+        return file_path
+
+    def _play_file(self, file_path):
+        try:
+            if not mixer.get_init():
+                mixer.init()
+        except Exception as e:
+            print(f"[VoicePrompt] Cannot init mixer: {e}")
+            return
+
+        try:
+            mixer.music.stop()
+        except Exception:
+            pass
+
+        try:
+            mixer.music.load(file_path)
+            mixer.music.play()
+            print(f"[VoicePrompt] Playing {os.path.basename(file_path)}")
+        except Exception as e:
+            print(f"[VoicePrompt] Cannot play '{file_path}': {e}")
+
+    def play(self, key):
+        if key not in VOICE_PROMPTS:
+            print(f"[VoicePrompt] Unknown key: {key}")
+            return
+
+        def worker():
+            try:
+                with self._lock:
+                    file_path = self._ensure_file(key)
+                    self._play_file(file_path)
+            except Exception as e:
+                print(f"[VoicePrompt] Error while handling '{key}': {e}")
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def play_startup_greeting(self):
+        """เล่นเสียงต้อนรับเมื่อเริ่มระบบ (วันละครั้งต่อการรันแอป)"""
+
+        def worker():
+            try:
+                with self._lock:
+                    file_path = self.ensure_startup_greeting()
+                    self._play_file(file_path)
+            except Exception as e:
+                print(f"[VoicePrompt] Error while playing startup greeting: {e}")
+
+        threading.Thread(target=worker, daemon=True).start()
 
 # ------------------ ฝั่ง server------------------------
 from server.auth import auth
@@ -399,6 +492,12 @@ class login(ctk.CTkFrame):
 class HomePage(ctk.CTkFrame):
     def on_show(self):
         print("HomePage is now visible")
+        if (
+            hasattr(self.controller, "voice_player")
+            and not getattr(self.controller, "_startup_greeting_played", True)
+        ):
+            self.controller._startup_greeting_played = True
+            self.controller.voice_player.play_startup_greeting()
         # อัพเดทข้อมูลการตั้งค่ายาเมื่อแสดงหน้า
         self.update_medication_info()
         self.controller.start_background_polling()
@@ -4911,6 +5010,9 @@ class MainApp(ctk.CTk):
         self.geometry(f"{width}x{height}+{x}+{y}")
         
         self.advice = ''
+        self.voice_player = VoicePromptPlayer()
+        self.voice_player.ensure_startup_greeting()
+        self._startup_greeting_played = False
         self.battery_percent_var = ctk.DoubleVar(value=0.0)
         self.device_status_var = ctk.StringVar(value="0")
 
@@ -5372,6 +5474,10 @@ class MainApp(ctk.CTk):
                         self._save_medicine_history("failed")
                         return
                     
+                    if notification_type == "trigger_sos_call":
+                        self._trigger_sos_call(identifier)
+                        return
+                    
                     if not hasattr(self, 'user') or not self.user:
                         print("[Notification] ไม่สามารถส่งแจ้งเตือน: ยังไม่มีข้อมูลผู้ใช้")
                         return
@@ -5414,6 +5520,65 @@ class MainApp(ctk.CTk):
         except Exception as e:
             print(f"--- [MainApp] FAILED to start serial thread: {e} ---")
             self.device_status_var.set(f"Serial Error: {e}")
+
+    def _trigger_sos_call(self, reason_identifier=None):
+        """
+        เริ่มการกดปุ่ม SOS อัตโนมัติ (ใช้เมื่อผู้ป่วยไม่มารับยาครบ 5 รอบ)
+        """
+        if getattr(self, "_auto_sos_in_progress", False):
+            print("[Auto SOS] กำลังโทรอยู่แล้ว ข้ามการเรียกซ้ำ")
+            return
+
+        if not hasattr(self, 'user') or not self.user:
+            print("[Auto SOS] ไม่มีข้อมูลผู้ใช้ ไม่สามารถโทร SOS ได้")
+            return
+
+        line_token = self.user.get('token_line')
+        line_group = self.user.get('group_id')
+
+        if not line_token or not line_group:
+            print("[Auto SOS] ไม่มี Token หรือ Group ID สำหรับ SOS")
+            return
+
+        if getattr(self, "network_status_var", None) and self.network_status_var.get() == "offline":
+            print("[Auto SOS] เครือข่ายออฟไลน์ ไม่สามารถโทร SOS ได้")
+            return
+
+        self._auto_sos_in_progress = True
+
+        def _auto_sos_thread():
+            try:
+                print(f"[Auto SOS] เริ่มโทร SOS อัตโนมัติ (reason={reason_identifier})")
+                send_status = press_sos_automation(line_token, line_group)
+
+                if hasattr(self, 'notifier') and self.notifier:
+                    if send_status:
+                        self.after(
+                            0,
+                            lambda: self.notifier.show_notification(
+                                "ระบบโทร SOS อัตโนมัติแล้ว", success=True
+                            )
+                        )
+                    else:
+                        self.after(
+                            0,
+                            lambda: self.notifier.show_notification(
+                                "ส่งคำขอ SOS อัตโนมัติไม่สำเร็จ", success=False
+                            )
+                        )
+            except Exception as e:
+                print(f"[Auto SOS] เกิดข้อผิดพลาด: {e}")
+                if hasattr(self, 'notifier') and self.notifier:
+                    self.after(
+                        0,
+                        lambda: self.notifier.show_notification(
+                            f"SOS อัตโนมัติผิดพลาด: {e}", success=False
+                        )
+                    )
+            finally:
+                self._auto_sos_in_progress = False
+
+        threading.Thread(target=_auto_sos_thread, daemon=True).start()
     def _get_medicines_for_current_time(self):
         """
         ดึง medicine_id จาก schedule ที่ตรงกับเวลาปัจจุบัน
@@ -5539,38 +5704,72 @@ class MainApp(ctk.CTk):
 
     # อัพเดตสถานะการจ่ายยา
     def status_callback(self,*args):
-        new_status = self.device_status_var.get()
+        new_status = str(self.device_status_var.get())
         current_time = time.time()
         
-        # เก็บ timestamp ของ status ต่างๆ
         if not hasattr(self, 'status_timestamps'):
             self.status_timestamps = {}
-        
-        self.status_timestamps[new_status] = current_time
 
-        if new_status == "1":
-            # จ่ายยาสำเร็จ
-            if '0' in self.status_timestamps:
-                time_state = self.status_timestamps.get('0', current_time)
-                duration = current_time - time_state
+        dontpick_match = re.match(r"dontpick(\d+)", new_status.strip().lower())
+        if dontpick_match:
+            count = dontpick_match.group(1)
+            self.status_timestamps[f"dontpick{count}"] = current_time
+            print(f"Status: ผู้ป่วยไม่มารับยา (ครั้งที่ {count})")
+            if getattr(self, 'voice_player', None):
+                self.voice_player.play("dontpick")
+            return
+        
+        normalized_status = self._normalize_status_value(new_status)
+        timestamp_key = normalized_status or new_status
+        if timestamp_key:
+            self.status_timestamps[timestamp_key] = current_time
+
+        if normalized_status == "complete":
+            fail_start = self.status_timestamps.get("fail")
+            duration = None
+            if fail_start:
+                duration = current_time - fail_start
                 duration_minutes = duration / 60
-            
-            if '0' in self.status_timestamps and duration_minutes > self.user.get('alert_delay', 0):
-                print(f"!!! test !!! (Duration {duration:.0f}s > {self.user.get('alert_delay', 0)}s)")
+                alert_delay = self.user.get('alert_delay', 0) if self.user else 0
+                if duration_minutes > alert_delay:
+                    print(f"!!! test !!! (Duration {duration:.0f}s > {alert_delay}m)")
+                else:
+                    print(f"--- ทดสอบ --- (Duration {duration:.0f}s <= {alert_delay}m)")
             else:
-                print(f"--- ทดสอบ --- (Duration {duration:.0f}s <= {self.user.get('alert_delay', 0)}s)")
+                print("Status: complete (จ่ายยาสำเร็จ)")
+
+            if getattr(self, 'voice_player', None):
+                self.voice_player.play("complete")
 
             homePage = self.frames[HomePage]
             homePage.reduce_medicine()
-            
-            # บันทึกประวัติการจ่ายยาสำเร็จ
             self._save_medicine_history("success")
-            
-        elif new_status == "0":
-            # จ่ายยาล้มเหลว - จะบันทึกเมื่อ status=0 ติดกัน 5 ครั้ง (จัดการใน serial_handler)
-            print("Status: 0 (จ่ายยาล้มเหลว)")
+
+        elif normalized_status == "fail":
+            print("Status: fail (จ่ายยาล้มเหลว)")
+            if getattr(self, 'voice_player', None):
+                self.voice_player.play("fail")
+
+        elif normalized_status == "nopush":
+            print("Status: nopush (ยังไม่มีการดันยา)")
+
+        elif normalized_status:
+            print(f"Status update: {normalized_status}")
         else:
-            print("Action: OK")
+            print(f"Status update: {new_status}")
+
+    @staticmethod
+    def _normalize_status_value(status):
+        if status is None:
+            return None
+        status_str = str(status).strip().lower()
+        if status_str in {"fail", "complete", "nopush"}:
+            return status_str
+        if status_str == "0":
+            return "fail"
+        if status_str == "1":
+            return "complete"
+        return status_str
 
     def load_user_data(self):
 

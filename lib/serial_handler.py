@@ -2,11 +2,13 @@ import serial
 import time
 from datetime import datetime, timedelta
 import json
+import re
 from threading import Lock
 
 # ค่าคงที่สำหรับ Serial port
 DEFAULT_SERIAL_PORT = "/dev/serial0"
 DEFAULT_BAUDRATE = 115200
+DONT_PICK_THRESHOLD = 5
 
 allTime = []
 _receive_buffer = ""
@@ -355,6 +357,7 @@ def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=Non
     last_status_value = None
     status_fail_count = 0  # นับจำนวนครั้งที่ได้รับสถานะ fail ติดกัน
     STATUS_FAIL_THRESHOLD = 5  # จำนวนครั้งที่ต้องได้รับสถานะ fail ก่อนส่งคำสั่ง cmd=1
+    dontpick_sos_triggered = False
     command_tolerance_after_sec = 60  # ส่งคำสั่งภายใน 60 วินาทีหลังถึงเวลาที่ตั้งไว้
     command_tolerance_before_sec = 0   # ไม่ส่งก่อนเวลาที่ตั้งไว้
 
@@ -497,16 +500,71 @@ def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=Non
                                 if status_fail_count > 0:
                                     print(f"Status changed from fail to {display_status}, resetting count")
                                     status_fail_count = 0
+                                
+                                if normalized_status in {"complete", "fail", "nopush"}:
+                                    dontpick_sos_triggered = False
                             
                             # อัพเดต last_status_value
                             last_status_value = normalized_status
                         except Exception as e:
                             print(f"Error setting status_var: {e}")
                 elif isinstance(received_data, str):
-                    if last_special_message == received_data:
+                    normalized_special = received_data.strip()
+                    lower_special = normalized_special.lower()
+
+                    dontpick_match = re.match(r"dontpick(\d+)", lower_special)
+                    if dontpick_match:
+                        try:
+                            dontpick_count = int(dontpick_match.group(1))
+                        except (TypeError, ValueError):
+                            dontpick_count = 0
+
+                        if dontpick_count == 1:
+                            dontpick_sos_triggered = False
+
+                        print(f"Received dontpick count: {dontpick_count}")
+
+                        if status_var is not None:
+                            try:
+                                status_var.set(normalized_special)
+                            except Exception as e:
+                                print(f"Error setting status_var with dontpick: {e}")
+
+                        if (
+                            dontpick_count >= DONT_PICK_THRESHOLD
+                            and not dontpick_sos_triggered
+                        ):
+                            dontpick_identifier = f"dontpick_{dontpick_count}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                            message = (
+                                "🚨 [SeniorCare Pro] แจ้งเตือน\n\n"
+                                "❗ ผู้ป่วยยังไม่มารับยา\n"
+                                f"จำนวนรอบที่ไม่รับยา: {dontpick_count}/{DONT_PICK_THRESHOLD}\n"
+                                f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                                "ระบบจะเริ่มการโทร SOS อัตโนมัติ"
+                            )
+                            if notification_callback:
+                                try:
+                                    notification_callback(
+                                        "dontpick_threshold",
+                                        dontpick_identifier,
+                                        message
+                                    )
+                                    notification_callback(
+                                        "trigger_sos_call",
+                                        dontpick_identifier,
+                                        None
+                                    )
+                                except Exception as e:
+                                    print(f"Error handling dontpick notification: {e}")
+                            dontpick_sos_triggered = True
+
+                        last_special_message = normalized_special
                         continue
 
-                    last_special_message = received_data
+                    if last_special_message == normalized_special:
+                        continue
+
+                    last_special_message = normalized_special
                     # ข้อความพิเศษจาก ESP32 (เช่น "rehome_sent", "cmd_1_sent", "waiting")
                     print(f"Received special message: {received_data}")
                     
