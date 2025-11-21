@@ -122,6 +122,18 @@ class VoicePromptPlayer:
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def preload_all_prompts(self):
+        """สร้างไฟล์เสียงสำหรับทุกสถานะตั้งแต่เริ่มระบบ"""
+        try:
+            with self._lock:
+                for key in VOICE_PROMPTS:
+                    try:
+                        self._ensure_file(key)
+                    except Exception as e:
+                        print(f"[VoicePrompt] Failed to preload '{key}': {e}")
+        except Exception as e:
+            print(f"[VoicePrompt] Error while preloading prompts: {e}")
+
 # ------------------ ฝั่ง server------------------------
 from server.auth import auth
 from server.info import infoData
@@ -5012,6 +5024,7 @@ class MainApp(ctk.CTk):
         self.advice = ''
         self.voice_player = VoicePromptPlayer()
         self.voice_player.ensure_startup_greeting()
+        self.voice_player.preload_all_prompts()
         self._startup_greeting_played = False
         self.battery_percent_var = ctk.DoubleVar(value=0.0)
         self.device_status_var = ctk.StringVar(value="0")
