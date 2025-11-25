@@ -1436,7 +1436,7 @@ class HomePage(ctk.CTkFrame):
             # ⭐️ [FIX] 1. "พยายาม" ดึงข้อมูลจากเซิร์ฟเวอร์ก่อนเสมอ ⭐️
             # (เราจะไม่ตรวจสอบ network_status_var ที่นี่แล้ว)
             print("Background Thread (HomePage): กำลังพยายามดึงข้อมูลจากเซิร์ฟเวอร์...")
-            meal_api_result = set_dispensing_time.get_meal(
+            meal_api_result = set_dispensing_time.get_meal( 
                 self.controller.user['device_id'],
                 self.controller.user['id']
             )
@@ -5358,7 +5358,7 @@ class MainApp(ctk.CTk):
             
             self.has_sent_online_notification = True
             
-            if self.user:
+            if self.user: 
                 try:
                     user_name = self.user.get('firstname_th', 'ผู้ใช้')
                     device_id = self.user.get('device_id', 'N/A')
@@ -5374,7 +5374,8 @@ class MainApp(ctk.CTk):
                         f"ได้เชื่อมต่ออินเทอร์เน็ตและพร้อมใช้งานแล้ว"
                     )
 
-                    sendtoLine(line_token, line_group, line_message)
+
+                    # sendtoLine(line_token, line_group, line_message)
                 
                 except Exception as e:
                     print(f"❌ เกิดข้อผิดพลาดขณะเตรียมส่งแจ้งเตือนออนไลน์: {e}")

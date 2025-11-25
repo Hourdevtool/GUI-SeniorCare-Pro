@@ -5,6 +5,8 @@ import string
 import time
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.service import Service
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import WebDriverException
@@ -30,9 +32,14 @@ def press_sos_automation(token, group_id): # (แก้ typo gruop_id -> group_i
 
     try:
         # 1. ตั้งค่า Selenium (เหมือนเดิม)
-        options = Options() 
-        
-        driver = webdriver.Firefox(options=options)
+        options = Options()
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--headless")  # ถ้าต้องการไม่ให้เด้งหน้าจอ
+
+        service = Service("/usr/bin/geckodriver")
+        driver = webdriver.Firefox(service=service, options=options)
+
         
         # 2. ย้ายหน้าต่างไปซ่อนนอกจอระหว่างโหลด
         print("กำลังซ่อนหน้าต่างชั่วคราว...")
