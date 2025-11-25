@@ -14,7 +14,14 @@ from pywifi import PyWiFi
 from babel.dates import format_date
 # model format เวลา
 from lib.set_time import default_serializer
-from lib.serial_handler import recivetime,start_Serial_loop
+from lib.serial_handler import (
+    recivetime,
+    start_Serial_loop,
+    request_reset_data_command,
+    request_instant_dispense_command,
+    get_dont_pick_threshold,
+    set_dont_pick_threshold,
+)
 from notifier import Notifier
 from network_monitor import NetworkMonitor
 import serial
@@ -40,6 +47,7 @@ STARTUP_GREETING = {
     "text": "สวัสดีครับโฮมแคร์พร้อมให้บริการครับ",
     "filename": "startup_greeting.mp3",
 }
+TEST_MODE_EMAIL = "siri@gmail.com"
 
 
 class VoicePromptPlayer:
@@ -504,6 +512,7 @@ class login(ctk.CTkFrame):
 class HomePage(ctk.CTkFrame):
     def on_show(self):
         print("HomePage is now visible")
+        self.update_test_mode_visibility()
         if (
             hasattr(self.controller, "voice_player")
             and not getattr(self.controller, "_startup_greeting_played", True)
@@ -1022,6 +1031,9 @@ class HomePage(ctk.CTkFrame):
         )
         self.medicine_frame.place(x=20, y=280)
         #pywinstyles.set_opacity(self.medicine_frame, value=1, color="#000001")
+        self.test_mode_section = None
+        self.test_mode_slider = None
+        self.test_mode_value_label = None
     
         # หัวข้อพร้อมไอคอน
         header_frame = ctk.CTkFrame(
@@ -1084,7 +1096,114 @@ class HomePage(ctk.CTkFrame):
         self.counter_medicine.place(x=25, y=60)
         
         print(f"สร้างส่วนแสดงจำนวนยาคงเหลือเสร็จสิ้น: {self.medicine_count} เม็ด")
+        self._build_test_mode_controls()
     
+    def _build_test_mode_controls(self):
+        if self.test_mode_section is not None:
+            return
+
+        self._test_mode_position = {"x": 700, "y": 120}
+        self.test_mode_section = ctk.CTkFrame(
+            self,
+            width=300,
+            height=120,
+            corner_radius=0,
+            fg_color="#E8F4FD",
+        )
+        self.test_mode_section.place(**self._test_mode_position)
+        self.test_mode_section.place_forget()
+
+        title_label = ctk.CTkLabel(
+            self.test_mode_section,
+            text="TEST MODE",
+            font=("TH Sarabun New", 20, "bold"),
+            text_color="#1D3557",
+        )
+        title_label.place(x=10, y=5)
+
+        self.instant_dispense_button = ctk.CTkButton(
+            self.test_mode_section,
+            text="จ่ายยาทันที",
+            font=("TH Sarabun New", 20, "bold"),
+            fg_color="#FF7043",
+            hover_color="#F4511E",
+            text_color="white",
+            corner_radius=8,
+            height=50,
+            width=110,
+            command=self._trigger_test_mode_dispense,
+        )
+        self.instant_dispense_button.place(x=10, y=40)
+
+
+        slider_label = ctk.CTkLabel(
+            self.test_mode_section,
+            text="รอบรับยา",
+            font=("TH Sarabun New",20, "bold"),
+            text_color="#1D3557",
+        )
+        slider_label.place(x=150, y=28)
+
+        self.test_mode_value_label = ctk.CTkLabel(
+            self.test_mode_section,
+            text="0 ครั้ง",
+            font=("TH Sarabun New", 20, "bold"),
+            text_color="#1D3557",
+        )
+        self.test_mode_value_label.place(x=150, y=75)
+
+        self.test_mode_slider = ctk.CTkSlider(
+            self.test_mode_section,
+            from_=1,
+            to=6,
+            number_of_steps=5,
+            command=self._on_test_mode_slider_change,
+            width=120,
+        )
+        self.test_mode_slider.place(x=150, y=50)
+        self._sync_test_mode_slider()
+
+    def _trigger_test_mode_dispense(self):
+        try:
+            request_instant_dispense_command()
+            if hasattr(self.controller, "notifier") and self.controller.notifier:
+                self.controller.notifier.show_notification(
+                    "ส่งคำสั่งจ่ายยาทันที (Test Mode)", success=True
+                )
+            print("Triggered instant dispense via Test Mode")
+        except Exception as e:
+            print(f"Error triggering Test Mode dispense: {e}")
+            if hasattr(self.controller, "notifier") and self.controller.notifier:
+                self.controller.notifier.show_notification(
+                    f"ส่งคำสั่ง Test Mode ไม่สำเร็จ: {e}", success=False
+                )
+
+    def _on_test_mode_slider_change(self, value):
+        threshold = int(round(float(value)))
+        set_dont_pick_threshold(threshold)
+        self._update_test_mode_slider_label(threshold)
+
+    def _update_test_mode_slider_label(self, threshold):
+        if self.test_mode_value_label is not None:
+            self.test_mode_value_label.configure(text=f"{threshold} ครั้ง")
+
+    def _sync_test_mode_slider(self):
+        if self.test_mode_slider is None:
+            return
+        current_threshold = get_dont_pick_threshold()
+        self.test_mode_slider.set(current_threshold)
+        self._update_test_mode_slider_label(current_threshold)
+
+    def update_test_mode_visibility(self):
+        if self.test_mode_section is None:
+            return
+        is_test_account = getattr(self.controller, "is_test_account", False)
+        if is_test_account:
+            self.test_mode_section.place(**self._test_mode_position)
+            self._sync_test_mode_slider()
+        else:
+            self.test_mode_section.place_forget()
+
     def reset_and_update(self):
         response = messagebox.askyesno(
             "ยืนยันการรีเซ็ต", 
@@ -1146,6 +1265,11 @@ class HomePage(ctk.CTkFrame):
             current_status = self.controller.network_status_var.get()
             set_counter.update_counter(self.controller.user['device_id'],self.controller.user['id'],initial_count,current_status)
             self.update_medicine_count(initial_count)
+            try:
+                request_reset_data_command()
+                print("Triggered reset_data due to manual UI reset")
+            except Exception as e:
+                print(f"Warning: unable to trigger reset_data after manual reset: {e}")
             
             # แสดงข้อความยืนยัน
             messagebox.showinfo("สำเร็จ", f"รีเซ็ตจำนวนยาเป็น {initial_count} เม็ดเรียบร้อยแล้ว")
@@ -1237,6 +1361,7 @@ class HomePage(ctk.CTkFrame):
                 
             print("อัพเดทข้อมูลผู้ใช้เสร็จสิ้น")
             self._updating_user_info = False
+            self.update_test_mode_visibility()
                 
         except Exception as e:
             print(f"เกิดข้อผิดพลาดในการอัพเดทข้อมูลผู้ใช้: {e}")
@@ -4994,6 +5119,7 @@ class MainApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.user = None
+        self.is_test_account = False
         self.title("เครื่องโฮมแคร์อัจฉริยะควบคุมผ่านระบบ SeniorCare Pro")
         #  loop Data api
         self.polling_thread_active = False
@@ -5248,12 +5374,11 @@ class MainApp(ctk.CTk):
                         f"ได้เชื่อมต่ออินเทอร์เน็ตและพร้อมใช้งานแล้ว"
                     )
 
-
-                    # sendtoLine(line_token, line_group, line_message)
+                    sendtoLine(line_token, line_group, line_message)
                 
                 except Exception as e:
                     print(f"❌ เกิดข้อผิดพลาดขณะเตรียมส่งแจ้งเตือนออนไลน์: {e}")
-            else:
+            else: 
                 print("⚠️ ไม่สามารถส่งแจ้งเตือนออนไลน์ได้, self.user ยังไม่ถูกโหลด")
         
         # --- END: โค้ดใหม่ ---
@@ -5458,17 +5583,17 @@ class MainApp(ctk.CTk):
             PORT = "/dev/serial0"
             BAUDRATE = 115200
 
-            # # สร้าง callback function เพื่อตรวจสอบจำนวนยาคงเหลือ (ปิดใช้งานชั่วคราว: ยังไม่ถูกใช้)
-            # def get_medicine_count():
-            #     \"\"\"Callback function ที่คืนค่าจำนวนยาคงเหลือ\"\"\"
-            #     try:
-            #         if hasattr(self, 'user') and self.user:
-            #             count = self.user.get('count_medicine')
-            #             if count is not None:
-            #                 return int(count)
-            #     except Exception as e:
-            #         print(f\"Error getting medicine count: {e}\")
-            #     return None
+            # สร้าง callback function เพื่อตรวจสอบจำนวนยาคงเหลือ
+            def get_medicine_count():
+                """Callback function ที่คืนค่าจำนวนยาคงเหลือ"""
+                try:
+                    if hasattr(self, 'user') and self.user:
+                        count = self.user.get('count_medicine')
+                        if count is not None:
+                            return int(count)
+                except Exception as e:
+                    print(f"Error getting medicine count: {e}")
+                return None
 
             # สร้าง callback function สำหรับแจ้งเตือน LINE
             def notification_callback(notification_type, identifier, message):
@@ -5525,7 +5650,8 @@ class MainApp(ctk.CTk):
                     self.battery_percent_var, 
                     self.device_status_var,
                     5.0,  # request_interval
-                    notification_callback  # notification_callback
+                    notification_callback,  # notification_callback
+                    get_medicine_count,
                 ),
                 daemon=True 
             )
@@ -5536,7 +5662,7 @@ class MainApp(ctk.CTk):
 
     def _trigger_sos_call(self, reason_identifier=None):
         """
-        เริ่มการกดปุ่ม SOS อัตโนมัติ (ใช้เมื่อผู้ป่วยไม่มารับยาครบ 5 รอบ)
+        เริ่มการกดปุ่ม SOS อัตโนมัติ (ใช้เมื่อผู้ป่วยไม่มารับยาครบ 6 รอบ)
         """
         if getattr(self, "_auto_sos_in_progress", False):
             print("[Auto SOS] กำลังโทรอยู่แล้ว ข้ามการเรียกซ้ำ")
@@ -5796,16 +5922,32 @@ class MainApp(ctk.CTk):
                 
                 if user_data:
                     self.user = user_data
+                    self.is_test_account = self.user.get("email") == TEST_MODE_EMAIL
                     self.network_status_var.set("online")
                     self.show_frame(HomePage)
+                    home_frame = self.frames.get(HomePage)
+                    if home_frame:
+                        home_frame.update_test_mode_visibility()
 
                 else:
+                    self.is_test_account = False
+                    home_frame = self.frames.get(HomePage)
+                    if home_frame:
+                        home_frame.update_test_mode_visibility()
                     self.show_frame(login)
             except Exception as e:
                 print(f"เกิดข้อผิดพลาดขณะโหลด user_data.json: {e}")
+                self.is_test_account = False
+                home_frame = self.frames.get(HomePage)
+                if home_frame:
+                    home_frame.update_test_mode_visibility()
                 self.show_frame(login)
         else:
             print("ไม่พบไฟล์ user_data.json - แสดงหน้า login")
+            self.is_test_account = False
+            home_frame = self.frames.get(HomePage)
+            if home_frame:
+                home_frame.update_test_mode_visibility()
             self.show_frame(login)
     
 

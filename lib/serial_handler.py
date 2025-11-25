@@ -3,18 +3,81 @@ import time
 from datetime import datetime, timedelta
 import json
 import re
-from threading import Lock
+from threading import Lock, Event
 
 # ค่าคงที่สำหรับ Serial port
 DEFAULT_SERIAL_PORT = "/dev/serial0"
 DEFAULT_BAUDRATE = 115200
-DONT_PICK_THRESHOLD = 5
+DONT_PICK_THRESHOLD = 6
+MIN_DONT_PICK_THRESHOLD = 1
+MAX_DONT_PICK_THRESHOLD = 6
 
 allTime = []
 _receive_buffer = ""
 LOG_INCOMPLETE_WARNING = False
 _schedule_lock = Lock()
 _triggered_schedule_keys = set()
+_manual_reset_event = Event()
+_instant_dispense_event = Event()
+_current_dont_pick_threshold = DONT_PICK_THRESHOLD
+def request_reset_data_command():
+    """
+    แจ้ง Serial loop ให้ส่งคำสั่ง reset_data (cmd=1) หนึ่งครั้ง
+    ใช้เมื่อผู้ใช้กดรีเซ็ตจำนวนยาบน UI
+    """
+    _manual_reset_event.set()
+
+
+def request_instant_dispense_command():
+    """
+    แจ้ง Serial loop ให้จ่ายยาทันที (cmd=1, message=init) โดยไม่รอ schedule
+    """
+    _instant_dispense_event.set()
+
+
+def get_dont_pick_threshold():
+    """คืนค่าจำนวนครั้ง dontpick ที่ต้องรอก่อนโทร SOS"""
+    return _current_dont_pick_threshold
+
+
+def set_dont_pick_threshold(value):
+    """
+    ปรับจำนวนครั้ง dontpick ที่ต้องรอก่อนโทร SOS (ช่วง 1-6)
+    """
+    global _current_dont_pick_threshold
+    try:
+        new_value = int(round(float(value)))
+    except (TypeError, ValueError):
+        print(f"Warning: Invalid dontpick threshold value: {value}")
+        return _current_dont_pick_threshold
+
+    new_value = max(MIN_DONT_PICK_THRESHOLD, min(MAX_DONT_PICK_THRESHOLD, new_value))
+    if new_value != _current_dont_pick_threshold:
+        _current_dont_pick_threshold = new_value
+        print(f"Dontpick SOS threshold updated to {new_value}")
+    return _current_dont_pick_threshold
+
+
+def _get_effective_dont_pick_threshold():
+    return max(MIN_DONT_PICK_THRESHOLD, min(MAX_DONT_PICK_THRESHOLD, _current_dont_pick_threshold))
+
+
+def _send_reset_data_command(ser, cmd_value, reason=""):
+    """
+    ส่งคำสั่ง reset_data ไปยังบอร์ดด้วย cmd ที่ระบุ
+    """
+    try:
+        command_data = {"cmd": cmd_value, "message": "reset_data"}
+        command = json.dumps(command_data) + "\n"
+        context = f" ({reason})" if reason else ""
+        print(f"TX reset_data{context}: {command.strip()}")
+        _clear_serial_buffers(ser)
+        ser.write(command.encode("utf-8"))
+        ser.flush()
+        return True
+    except Exception as e:
+        print(f"Error sending reset_data command{context}: {e}")
+        return False
 
 
 def _handle_special_message(data):
@@ -118,7 +181,6 @@ def pySerialSendData(ser, reset=True):
     try:
         data = {
                 "cmd": 0,
-                # "message": "reset_data"
                 "message": "init"
             }
         command = json.dumps(data) + "\n"
@@ -299,7 +361,15 @@ def send_cmd1_command(ser, timeout=5.0):
         return response
     return None
     
-def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=None, request_interval=5.0, notification_callback=None):
+def start_Serial_loop(
+    port=None,
+    baudrate=None,
+    battery_var=None,
+    status_var=None,
+    request_interval=5.0,
+    notification_callback=None,
+    medicine_count_getter=None,
+):
     """Loop หลักที่ส่งคำสั่งไปหา ESP32 แล้วรอรับข้อมูลตอบกลับ
     
     Args:
@@ -360,9 +430,65 @@ def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=Non
     dontpick_sos_triggered = False
     command_tolerance_after_sec = 60  # ส่งคำสั่งภายใน 60 วินาทีหลังถึงเวลาที่ตั้งไว้
     command_tolerance_before_sec = 0   # ไม่ส่งก่อนเวลาที่ตั้งไว้
+    zero_cycle_reset_sent = False  # ป้องกันการส่ง reset_data ซ้ำเมื่อ count = 0
+    startup_full_check_pending = True  # ใช้ตรวจสอบเงื่อนไขหลังไฟดับ/รีสตาร์ท
+    medicine_count_error_logged = False
+
+    def _get_medicine_count():
+        if not callable(medicine_count_getter):
+            return None
+        nonlocal medicine_count_error_logged
+        try:
+            value = medicine_count_getter()
+            if value is None:
+                return None
+            return int(value)
+        except (TypeError, ValueError):
+            if not medicine_count_error_logged:
+                print(f"Warning: medicine_count_getter returned non-integer value: {value}")
+                medicine_count_error_logged = True
+            return None
+        except Exception as e:
+            if not medicine_count_error_logged:
+                print(f"Warning: Cannot read medicine count: {e}")
+                medicine_count_error_logged = True
+            return None
 
     try:
         while True:
+            # === ตรวจสอบเหตุการณ์ reset_data ก่อน ===
+            current_count = _get_medicine_count()
+
+            if _instant_dispense_event.is_set():
+                _instant_dispense_event.clear()
+                try:
+                    command_data = {"cmd": 1, "message": "init"}
+                    command = json.dumps(command_data) + "\n"
+                    print("TX (instant dispense):", command.strip())
+                    _clear_serial_buffers(ser)
+                    ser.write(command.encode("utf-8"))
+                    ser.flush()
+                except Exception as e:
+                    print(f"Error sending instant dispense command: {e}")
+
+            if _manual_reset_event.is_set():
+                _manual_reset_event.clear()
+                if _send_reset_data_command(ser, 1, reason="ui_manual_reset"):
+                    zero_cycle_reset_sent = False  # เริ่มรอบใหม่หลังรีเซ็ต
+
+            if startup_full_check_pending and current_count is not None:
+                startup_full_check_pending = False
+                if current_count == 28:
+                    _send_reset_data_command(ser, 1, reason="startup_full_tray")
+
+            if current_count is not None:
+                if current_count == 0:
+                    if not zero_cycle_reset_sent:
+                        if _send_reset_data_command(ser, 0, reason="cycle_complete"):
+                            zero_cycle_reset_sent = True
+                else:
+                    zero_cycle_reset_sent = False
+
             # รับข้อมูลจาก ESP32 ตลอดเวลา (ESP32 ส่งสถานะกลับมาทุกวินาที)
             received_data = pySerialReceiveData(ser, timeout=5) 
             
@@ -448,34 +574,30 @@ def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=Non
                             else:
                                 # ถ้าสถานะไม่ใช่ fail
                                 if status_changed and last_status_value == "fail":
-                                    # ส่ง reset_data เมื่อสถานะเปลี่ยนจาก fail เป็นค่าอื่น
-                                    try:
-                                        command_data = {"cmd": 1, "message": "reset_data"}
-                                        command = json.dumps(command_data) + "\n"
-                                        print(f"TX (reset_data after fail): {command.strip()}")
-                                        _clear_serial_buffers(ser)
-                                        ser.write(command.encode("utf-8"))
-                                        ser.flush()
-                                    except Exception as e:
-                                        print(f"Error sending reset_data command: {e}")
+                                    # บังคับโทร SOS เมื่อสถานะเปลี่ยนจาก fail เป็นค่าอื่น
+                                    fail_recovery_identifier = f"fail_recovery_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                                    print(f"Status changed from fail to {display_status}, triggering SOS call")
                                     
-                                    # แจ้งเตือน: จ่ายยาสำเร็จหลังจากล้มเหลว
-                                    if notification_callback:
+                                    if notification_callback: 
                                         try:
                                             message = (
-                                                "✅ [SeniorCare Pro] แจ้งเตือน\n\n"
-                                                f"✅ การจ่ายยาสำเร็จ\n"
-                                                f"สถานะ: เปลี่ยนจาก fail เป็น {display_status}\n"
+                                                "🚨 [SeniorCare Pro] แจ้งเตือน\n\n"
+                                                f"⚠️ สถานะเปลี่ยนจาก fail เป็น {display_status}\n"
                                                 f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                                                f"ระบบได้จ่ายยาสำเร็จหลังจากที่ล้มเหลวก่อนหน้านี้"
+                                                f"ระบบจะเริ่มการโทร SOS อัตโนมัติ"
                                             )
                                             notification_callback(
-                                                "cmd_success",
-                                                f"status_recovered_{display_status}",
+                                                "fail_recovery_sos",
+                                                fail_recovery_identifier,
                                                 message
                                             )
+                                            notification_callback(
+                                                "trigger_sos_call",
+                                                fail_recovery_identifier,
+                                                None
+                                            )
                                         except Exception as e:
-                                            print(f"Error sending recovery notification: {e}")
+                                            print(f"Error triggering SOS after fail recovery: {e}")
                                 
                                 # แจ้งเตือนเมื่อสถานะ complete (จ่ายยาสำเร็จ)
                                 if normalized_status == "complete" and status_changed:
@@ -530,15 +652,16 @@ def start_Serial_loop(port=None, baudrate=None, battery_var=None, status_var=Non
                             except Exception as e:
                                 print(f"Error setting status_var with dontpick: {e}")
 
+                        current_threshold = _get_effective_dont_pick_threshold()
                         if (
-                            dontpick_count >= DONT_PICK_THRESHOLD
+                            dontpick_count >= current_threshold
                             and not dontpick_sos_triggered
                         ):
                             dontpick_identifier = f"dontpick_{dontpick_count}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
                             message = (
                                 "🚨 [SeniorCare Pro] แจ้งเตือน\n\n"
                                 "❗ ผู้ป่วยยังไม่มารับยา\n"
-                                f"จำนวนรอบที่ไม่รับยา: {dontpick_count}/{DONT_PICK_THRESHOLD}\n"
+                                f"จำนวนรอบที่ไม่รับยา: {dontpick_count}/{current_threshold}\n"
                                 f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                                 "ระบบจะเริ่มการโทร SOS อัตโนมัติ"
                             )
