@@ -5653,6 +5653,7 @@ class MainApp(ctk.CTk):
                     5.0,  # request_interval
                     notification_callback,  # notification_callback
                     get_medicine_count,
+                    self.voice_player.play,
                 ),
                 daemon=True 
             )

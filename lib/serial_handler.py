@@ -369,6 +369,7 @@ def start_Serial_loop(
     request_interval=5.0,
     notification_callback=None,
     medicine_count_getter=None,
+    sound_callback=None,
 ):
     """Loop หลักที่ส่งคำสั่งไปหา ESP32 แล้วรอรับข้อมูลตอบกลับ
     
@@ -425,8 +426,6 @@ def start_Serial_loop(
     last_payload = None
     last_special_message = None
     last_status_value = None
-    status_fail_count = 0  # นับจำนวนครั้งที่ได้รับสถานะ fail ติดกัน
-    STATUS_FAIL_THRESHOLD = 5  # จำนวนครั้งที่ต้องได้รับสถานะ fail ก่อนส่งคำสั่ง cmd=1
     dontpick_sos_triggered = False
     command_tolerance_after_sec = 60  # ส่งคำสั่งภายใน 60 วินาทีหลังถึงเวลาที่ตั้งไว้
     command_tolerance_before_sec = 0   # ไม่ส่งก่อนเวลาที่ตั้งไว้
@@ -523,91 +522,50 @@ def start_Serial_loop(
                             # ตรวจสอบว่า status เปลี่ยนหรือไม่
                             status_changed = (last_status_value != normalized_status)
                             
-                            # ตรวจสอบและนับสถานะ fail
+                            # ตรวจสอบสถานะ fail
                             if normalized_status == "fail":
-                                # ถ้าสถานะเปลี่ยนจากค่าอื่นเป็น fail ให้เริ่มนับใหม่
+                                # ถ้าสถานะเปลี่ยนเป็น fail ให้แจ้งเตือนทันทีและเล่นเสียง
                                 if status_changed:
-                                    status_fail_count = 1
-                                    print(f"Status changed to fail, starting count: {status_fail_count}/{STATUS_FAIL_THRESHOLD}")
-                                else:
-                                    # ถ้าสถานะยังเป็น fail อยู่ ให้เพิ่มตัวนับ
-                                    status_fail_count += 1
-                                    print(f"Status=fail detected (count: {status_fail_count}/{STATUS_FAIL_THRESHOLD})")
-                                
-                                # เมื่อครบ 5 ครั้งติดกัน ให้ส่งคำสั่ง cmd=1
-                                if status_fail_count >= STATUS_FAIL_THRESHOLD:
-                                    try:
-                                        command_data = {"cmd": 1, "message": "init"}
-                                        command = json.dumps(command_data) + "\n"
-                                        print(f"TX (cmd=1 after {STATUS_FAIL_THRESHOLD} fail): {command.strip()}")
-                                        _clear_serial_buffers(ser)
-                                        ser.write(command.encode("utf-8"))
-                                        ser.flush()
-                                        
-                                        # แจ้งเตือน: จ่ายยาไม่สำเร็จ (fail ติดกัน 5 ครั้ง)
-                                        if notification_callback:
-                                            try:
-                                                message = (
-                                                    "⚠️ [SeniorCare Pro] แจ้งเตือน\n\n"
-                                                    f"❌ การจ่ายยาล้มเหลว\n"
-                                                    f"สถานะ: ตรวจพบ fail ติดกัน {STATUS_FAIL_THRESHOLD} ครั้ง\n"
-                                                    f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                                                    f"ระบบได้ส่งคำสั่ง cmd=1 เพื่อลองจ่ายยาอีกครั้ง"
-                                                )
-                                                notification_callback(
-                                                    "cmd_failed",
-                                                    f"status_fail_{STATUS_FAIL_THRESHOLD}",
-                                                    message
-                                                )
-                                                # บันทึกประวัติการจ่ายยาล้มเหลว
-                                                notification_callback(
-                                                    "save_history_failed",
-                                                    f"status_fail_{STATUS_FAIL_THRESHOLD}",
-                                                    None  # ส่ง None เพื่อบอกว่าเป็น flag สำหรับบันทึกประวัติ
-                                                )
-                                            except Exception as e:
-                                                print(f"Error sending notification: {e}")
-                                        
-                                        status_fail_count = 0  # รีเซ็ตตัวนับหลังจากส่งคำสั่ง
-                                    except Exception as e:
-                                        print(f"Error sending cmd=1 command: {e}")
-                            else:
-                                # ถ้าสถานะไม่ใช่ fail
-                                if status_changed and last_status_value == "fail":
-                                    # บังคับโทร SOS เมื่อสถานะเปลี่ยนจาก fail เป็นค่าอื่น
-                                    fail_recovery_identifier = f"fail_recovery_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                                    print(f"Status changed from fail to {display_status}, triggering SOS call")
+                                    print(f"Status changed to fail. Triggering alert and sound.")
                                     
-                                    if notification_callback: 
+                                    # 1. เล่นเสียง fail.mp3
+                                    if sound_callback:
+                                        try:
+                                            sound_callback("fail")
+                                        except Exception as e:
+                                            print(f"Error playing fail sound: {e}")
+
+                                    # 2. แจ้งเตือนทาง LINE
+                                    if notification_callback:
                                         try:
                                             message = (
-                                                "🚨 [SeniorCare Pro] แจ้งเตือน\n\n"
-                                                f"⚠️ สถานะเปลี่ยนจาก fail เป็น {display_status}\n"
+                                                "❌ [SeniorCare Pro] แจ้งเตือน : การดันยาไม่สำเร็จ\n"
                                                 f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                                                f"ระบบจะเริ่มการโทร SOS อัตโนมัติ"
+                                                f"กรุณาตรวจสอบเครื่องจ่ายยา"
                                             )
                                             notification_callback(
-                                                "fail_recovery_sos",
-                                                fail_recovery_identifier,
+                                                "cmd_failed",
+                                                f"status_fail_{datetime.now().strftime('%Y%m%d%H%M%S')}",
                                                 message
                                             )
+                                            # บันทึกประวัติการจ่ายยาล้มเหลว
                                             notification_callback(
-                                                "trigger_sos_call",
-                                                fail_recovery_identifier,
+                                                "save_history_failed",
+                                                f"status_fail_immediate",
                                                 None
                                             )
                                         except Exception as e:
-                                            print(f"Error triggering SOS after fail recovery: {e}")
-                                
+                                            print(f"Error sending notification: {e}")
+                                    
+                                    # ไม่มีการโทร SOS (ตาม requirement)
+                            else:
+                                # ถ้าสถานะไม่ใช่ fail
                                 # แจ้งเตือนเมื่อสถานะ complete (จ่ายยาสำเร็จ)
                                 if normalized_status == "complete" and status_changed:
                                     if notification_callback:
                                         try:
                                             message = (
-                                                "✅ [SeniorCare Pro] แจ้งเตือน\n\n"
-                                                f"✅ การจ่ายยาสำเร็จ\n"
-                                                f"สถานะ: {display_status}\n"
-                                                f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                                                "✅ [SeniorCare Pro] แจ้งเตือน : การจ่ายยาสำเร็จ\n\n"
                                                 f"ระบบได้จ่ายยาสำเร็จตามปกติ"
                                             )
                                             notification_callback(
@@ -617,11 +575,6 @@ def start_Serial_loop(
                                             )
                                         except Exception as e:
                                             print(f"Error sending success notification: {e}")
-                                
-                                # รีเซ็ตตัวนับเมื่อสถานะไม่ใช่ fail
-                                if status_fail_count > 0:
-                                    print(f"Status changed from fail to {display_status}, resetting count")
-                                    status_fail_count = 0
                                 
                                 if normalized_status in {"complete", "fail", "nopush"}:
                                     dontpick_sos_triggered = False
@@ -659,10 +612,8 @@ def start_Serial_loop(
                         ):
                             dontpick_identifier = f"dontpick_{dontpick_count}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
                             message = (
-                                "🚨 [SeniorCare Pro] แจ้งเตือน\n\n"
-                                "❗ ผู้ป่วยยังไม่มารับยา\n"
-                                f"จำนวนรอบที่ไม่รับยา: {dontpick_count}/{current_threshold}\n"
-                                f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                                "❗ [SeniorCare Pro] แจ้งเตือน : ผู้ป่วยไม่รับยา\n"
+                                f"จำนวนรอบที่ไม่รับยา: {dontpick_count}/{current_threshold}\n\n"
                                 "ระบบจะเริ่มการโทร SOS อัตโนมัติ"
                             )
                             if notification_callback:
@@ -734,10 +685,7 @@ def start_Serial_loop(
                         if notification_callback:
                             try:
                                 message = (
-                                    "⏰ [SeniorCare Pro] แจ้งเตือน\n\n"
-                                    f"✅ ส่งคำสั่งจ่ายยาตามเวลา\n"
-                                    f"เวลาที่กำหนด: {schedule_str}\n"
-                                    f"เวลาที่ส่ง: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                                    "⏰ [SeniorCare Pro] แจ้งเตือน : จ่ายยาตามเวลาสำเร็จ\n\n"
                                     f"ระบบได้ส่งคำสั่งจ่ายยาตามเวลาที่กำหนดไว้"
                                 )
                                 notification_callback(
@@ -756,10 +704,7 @@ def start_Serial_loop(
                         if notification_callback:
                             try:
                                 message = (
-                                    "❌ [SeniorCare Pro] แจ้งเตือน\n\n"
-                                    f"❌ ส่งคำสั่งจ่ายยาตามเวลาไม่สำเร็จ\n"
-                                    f"เวลาที่กำหนด: {schedule_str}\n"
-                                    f"เวลาเกิดข้อผิดพลาด: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                                    "🚨 [SeniorCare Pro] แจ้งเตือน : จ่ายยาตามเวลาไม่สำเร็จ\n\n"
                                     f"ข้อผิดพลาด: {str(e)}"
                                 )
                                 notification_callback(
