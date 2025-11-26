@@ -859,7 +859,12 @@ class HomePage(ctk.CTkFrame):
     def shutdown_system(self):
         response = messagebox.askyesno("ยืนยัน", "คุณต้องการปิดเครื่องหรือไม่?")
         if response:
-            os.system("shutdown /s /t 1")
+            import sys
+            if sys.platform == 'win32':
+                os.system("shutdown /s /t 1")
+            else:
+                # สำหรับ Raspberry Pi / Linux
+                os.system("sudo shutdown -h now")
 
     def create_medication_display(self):
         # ปรับปรุงการแสดงข้อมูลยาให้สวยงาม
