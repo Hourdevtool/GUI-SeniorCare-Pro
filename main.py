@@ -1256,6 +1256,36 @@ class HomePage(ctk.CTkFrame):
         set_counter.update_counter(self.controller.user['device_id'],self.controller.user['id'],new_count,current_status)
         self.update_medicine_count(new_count)
 
+        # ตรวจสอบว่ายาหมดรอบหรือไม่ (เหลือ 0)
+        if new_count == 0:
+            print("Medicine count reached 0. Triggering cycle complete notification.")
+            try:
+                # 1. ส่งคำสั่ง Reset ไปยังบอร์ด (ถ้าเชื่อมต่ออยู่)
+                request_reset_data_command()
+                
+                # 2. แจ้งเตือน LINE
+                if hasattr(self.controller, 'user') and self.controller.user:
+                    line_token = self.controller.user.get('token_line')
+                    line_group = self.controller.user.get('group_id')
+                    
+                    if line_token and line_group:
+                        message = (
+                            "🔄 [SeniorCare Pro] แจ้งเตือน : จ่ายยาครบ 28 รอบ\n\n"
+                            "เครื่องได้ทำการรีเซ็ตตำแหน่งเริ่มต้นเรียบร้อยแล้ว\n"
+                            "กรุณาเติมยาและตรวจสอบความเรียบร้อย"
+                        )
+                        # ใช้ sendtoLineWithDeduplication ผ่าน thread แยก (หรือเรียกผ่าน alert โดยตรง)
+                        # แต่ในที่นี้เราจะใช้ sendtoLineWithDeduplication ที่ import มา
+                        sendtoLineWithDeduplication(
+                            token=line_token,
+                            group_id=line_group,
+                            message_data=message,
+                            notification_type="cycle_complete",
+                            identifier=f"cycle_reset_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        )
+            except Exception as e:
+                print(f"Error handling cycle complete: {e}")
+
     # ฟังก์ชันรีเซ็ตยา
     def reset_medicine_count(self):
         """รีเซ็ตจำนวนยากลับไปเป็นค่าเริ่มต้น"""
@@ -5852,23 +5882,6 @@ class MainApp(ctk.CTk):
     def status_callback(self,*args):
         new_status = str(self.device_status_var.get())
         current_time = time.time()
-        
-        if not hasattr(self, 'status_timestamps'):
-            self.status_timestamps = {}
-
-        dontpick_match = re.match(r"dontpick(\d+)", new_status.strip().lower())
-        if dontpick_match:
-            count = dontpick_match.group(1)
-            self.status_timestamps[f"dontpick{count}"] = current_time
-            print(f"Status: ผู้ป่วยไม่มารับยา (ครั้งที่ {count})")
-            if getattr(self, 'voice_player', None):
-                self.voice_player.play("dontpick")
-            return
-        
-        normalized_status = self._normalize_status_value(new_status)
-        timestamp_key = normalized_status or new_status
-        if timestamp_key:
-            self.status_timestamps[timestamp_key] = current_time
 
         if normalized_status == "complete":
             fail_start = self.status_timestamps.get("fail")
