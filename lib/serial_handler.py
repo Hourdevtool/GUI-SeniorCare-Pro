@@ -522,6 +522,56 @@ def start_Serial_loop(
                             # ตรวจสอบว่า status เปลี่ยนหรือไม่
                             status_changed = (last_status_value != normalized_status)
                             
+                            # ✅ ตรวจสอบ dontpick pattern ใน JSON status field
+                            status_str = str(new_status).strip().lower()
+                            dontpick_match = re.match(r"dontpick(\d+)", status_str)
+                            
+                            if dontpick_match:
+                                # พบ dontpick ใน JSON payload
+                                try:
+                                    dontpick_count = int(dontpick_match.group(1))
+                                except (TypeError, ValueError):
+                                    dontpick_count = 0
+
+                                if dontpick_count == 1:
+                                    dontpick_sos_triggered = False
+
+                                print(f"🔍 JSON: Received dontpick count: {dontpick_count}")
+
+                                current_threshold = _get_effective_dont_pick_threshold()
+                                print(f"🔍 DEBUG: dontpick_count={dontpick_count}, threshold={current_threshold}, sos_triggered={dontpick_sos_triggered}")
+                                
+                                if (
+                                    dontpick_count >= current_threshold
+                                    and not dontpick_sos_triggered
+                                ):
+                                    print(f"✅ Triggering SOS! (dontpick {dontpick_count} >= threshold {current_threshold})")
+                                    dontpick_identifier = f"dontpick_{dontpick_count}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                                    message = (
+                                        "❗ [SeniorCare Pro] แจ้งเตือน : ผู้ป่วยไม่รับยา\n"
+                                        f"จำนวนรอบที่ไม่รับยา: {dontpick_count}/{current_threshold}\n\n"
+                                        "ระบบจะเริ่มการโทร SOS อัตโนมัติ"
+                                    )
+                                    if notification_callback:
+                                        try:
+                                            notification_callback(
+                                                "dontpick_threshold",
+                                                dontpick_identifier,
+                                                message
+                                            )
+                                            notification_callback(
+                                                "trigger_sos_call",
+                                                dontpick_identifier,
+                                                None
+                                            )
+                                        except Exception as e:
+                                            print(f"Error handling dontpick notification: {e}")
+                                    dontpick_sos_triggered = True
+                                
+                                # อัพเดต last_status_value
+                                last_status_value = normalized_status
+                                continue  # ข้ามส่วนอื่นๆ เพราะ handle dontpick แล้ว
+                            
                             # ตรวจสอบสถานะ fail
                             if normalized_status == "fail":
                                 # ถ้าสถานะเปลี่ยนเป็น fail ให้แจ้งเตือนทันทีและเล่นเสียง
