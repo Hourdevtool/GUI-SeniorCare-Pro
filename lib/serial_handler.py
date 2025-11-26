@@ -485,6 +485,21 @@ def start_Serial_loop(
                     if not zero_cycle_reset_sent:
                         if _send_reset_data_command(ser, 0, reason="cycle_complete"):
                             zero_cycle_reset_sent = True
+                            # แจ้งเตือนเมื่อยาหมดรอบ (ครบ 28 ช่อง)
+                            if notification_callback:
+                                try:
+                                    message = (
+                                        "🔄 [SeniorCare Pro] แจ้งเตือน : จ่ายยาครบ 28 รอบ\n\n"
+                                        "เครื่องได้ทำการรีเซ็ตตำแหน่งเริ่มต้นเรียบร้อยแล้ว\n"
+                                        "กรุณาเติมยาและตรวจสอบความเรียบร้อย"
+                                    )
+                                    notification_callback(
+                                        "cycle_complete",
+                                        f"cycle_reset_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                                        message
+                                    )
+                                except Exception as e:
+                                    print(f"Error sending cycle complete notification: {e}")
                 else:
                     zero_cycle_reset_sent = False
 

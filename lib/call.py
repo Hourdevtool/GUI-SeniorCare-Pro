@@ -132,8 +132,11 @@ def press_sos_automation(token, group_id):
                     break
 
                 js_count = """
-                var videos = document.querySelectorAll('.videocontainer');
-                return videos.length;
+                 var videoElements = document.querySelectorAll('.filmstrip__videos .videocontainer');
+                    if (videoElements.length === 0) {
+                        videoElements = document.querySelectorAll('.tile-view-container .videocontainer');
+                    }
+                    return videoElements.length;
                 """
                 count = driver.execute_script(js_count)
                 count = int(count) if isinstance(count, int) else 1
