@@ -44,7 +44,7 @@ VOICE_PROMPTS = {
     "fail": {"text": "ดันยาไม่สำเร็จค่ะ", "filename": "fail.mp3"},
 }
 STARTUP_GREETING = {
-    "text": "สวัสดี โฮมแคร์พร้อมให้บริการค่ะ",
+    "text": "สวัสดีค่ะ ซีเนียร์แคร์โปรพร้อมให้บริการค่ะ",
     "filename": "startup_greeting.mp3",
 }
 TEST_MODE_EMAIL = "siri@gmail.com"
@@ -559,7 +559,7 @@ class HomePage(ctk.CTkFrame):
         # วันที่และเวลา
         self.date_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 35, "bold"),
                                        fg_color="#8acaef", text_color="white")
-        self.date_label.place(x=80, y=185)
+        self.date_label.place(x=58, y=185)
 
         self.time_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 40, "bold"),
                                        fg_color="#8acaef", text_color="white")
@@ -623,10 +623,10 @@ class HomePage(ctk.CTkFrame):
             self.update_battery_display()
         
         # โหลดรูป SOS ทั้งสองแบบ (ออนไลน์และออฟไลน์)
-        call_button_online = Image.open(f"{PATH}imgNew/sos.png").resize((60, 60), Image.Resampling.LANCZOS)
+        call_button_online = Image.open(f"{PATH}imgNew/sos.png").resize((100, 100), Image.Resampling.LANCZOS)
         self.call_photo_online = ImageTk.PhotoImage(call_button_online)
         
-        call_button_offline = Image.open(f"{PATH}imgNew/sos-offline.png").resize((60, 60), Image.Resampling.LANCZOS)
+        call_button_offline = Image.open(f"{PATH}imgNew/sos-offline.png").resize((100, 100), Image.Resampling.LANCZOS)
         self.call_photo_offline = ImageTk.PhotoImage(call_button_offline)
         
         # ใช้รูปออนไลน์เป็นค่าเริ่มต้น
@@ -645,14 +645,14 @@ class HomePage(ctk.CTkFrame):
             bg_color=sos_bg_color,
             fg_color=sos_fg_color,
             hover_color=sos_hover_color,
-            width=60,
+            width=100,
             border_width=0,  # เพิ่มขอบให้ดูสวยงาม
             border_color=sos_border_color,
             corner_radius=0,  # มุมโค้งมน
-            height=60,
+            height=100,
             command=self.on_video_call_click
         )
-        self.call_button.place(x=700, y=35)
+        self.call_button.place(x=550, y=35)
         
         # บันทึกสไตล์เดิมของปุ่ม SOS
         self.call_button_original_style = {

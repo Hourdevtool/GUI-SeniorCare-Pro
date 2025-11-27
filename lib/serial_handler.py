@@ -541,7 +541,7 @@ def start_Serial_loop(
                                 print(f"🔍 JSON: Received dontpick count: {dontpick_count}")
 
                                 # เล่นเสียง dontpick เมื่อพบ dontpick status (เล่นทุกครั้งที่ dontpick_count เปลี่ยน)
-                                if dontpick_count > 0 and dontpick_count != last_dontpick_count:
+                                if dontpick_count >= 0 and dontpick_count != last_dontpick_count:
                                     if sound_callback:
                                         try:
                                             sound_callback("dontpick")
@@ -671,7 +671,7 @@ def start_Serial_loop(
                         print(f"Received dontpick count: {dontpick_count}")
 
                         # เล่นเสียง dontpick เมื่อพบ dontpick status (เล่นทุกครั้งที่ dontpick_count เปลี่ยน)
-                        if dontpick_count > 0 and dontpick_count != last_dontpick_count:
+                        if dontpick_count >= 0 and dontpick_count != last_dontpick_count:
                             if sound_callback:
                                 try:
                                     sound_callback("dontpick")
