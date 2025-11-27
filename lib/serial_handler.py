@@ -427,7 +427,7 @@ def start_Serial_loop(
     last_special_message = None
     last_status_value = None
     dontpick_sos_triggered = False
-    last_dontpick_count = 0  # เก็บ dontpick_count ล่าสุดเพื่อป้องกันการเล่นเสียงซ้ำ
+    last_dontpick_count = -1  # เก็บ dontpick_count ล่าสุดเพื่อป้องกันการเล่นเสียงซ้ำ (-1 ให้ dontpick0 เล่นเสียงรอบแรก)
     last_threshold = _get_effective_dont_pick_threshold()  # เก็บ threshold ล่าสุดเพื่อตรวจสอบการเปลี่ยนแปลง
     command_tolerance_after_sec = 60  # ส่งคำสั่งภายใน 60 วินาทีหลังถึงเวลาที่ตั้งไว้
     command_tolerance_before_sec = 0   # ไม่ส่งก่อนเวลาที่ตั้งไว้
@@ -632,7 +632,7 @@ def start_Serial_loop(
                                 # แจ้งเตือนเมื่อสถานะ complete (จ่ายยาสำเร็จ)
                                 if normalized_status == "complete" and status_changed:
                                     # รีเซ็ต last_dontpick_count เมื่อสถานะเปลี่ยนเป็น complete
-                                    last_dontpick_count = 0
+                                    last_dontpick_count = -1
                                     if notification_callback:
                                         try:
                                             message = (
