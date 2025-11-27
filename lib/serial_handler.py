@@ -427,6 +427,8 @@ def start_Serial_loop(
     last_special_message = None
     last_status_value = None
     dontpick_sos_triggered = False
+    last_dontpick_count = 0  # เก็บ dontpick_count ล่าสุดเพื่อป้องกันการเล่นเสียงซ้ำ
+    last_threshold = _get_effective_dont_pick_threshold()  # เก็บ threshold ล่าสุดเพื่อตรวจสอบการเปลี่ยนแปลง
     command_tolerance_after_sec = 60  # ส่งคำสั่งภายใน 60 วินาทีหลังถึงเวลาที่ตั้งไว้
     command_tolerance_before_sec = 0   # ไม่ส่งก่อนเวลาที่ตั้งไว้
     zero_cycle_reset_sent = False  # ป้องกันการส่ง reset_data ซ้ำเมื่อ count = 0
@@ -538,7 +540,24 @@ def start_Serial_loop(
 
                                 print(f"🔍 JSON: Received dontpick count: {dontpick_count}")
 
+                                # เล่นเสียง dontpick เมื่อพบ dontpick status (เล่นทุกครั้งที่ dontpick_count เปลี่ยน)
+                                if dontpick_count > 0 and dontpick_count != last_dontpick_count:
+                                    if sound_callback:
+                                        try:
+                                            sound_callback("dontpick")
+                                            print(f"🔊 Playing dontpick sound (count: {dontpick_count})")
+                                        except Exception as e:
+                                            print(f"Error playing dontpick sound: {e}")
+                                    last_dontpick_count = dontpick_count
+
                                 current_threshold = _get_effective_dont_pick_threshold()
+                                
+                                # รีเซ็ต dontpick_sos_triggered เมื่อ threshold เปลี่ยน (สำหรับ test mode)
+                                if current_threshold != last_threshold:
+                                    print(f"🔄 Threshold changed from {last_threshold} to {current_threshold}, resetting SOS trigger flag")
+                                    dontpick_sos_triggered = False
+                                    last_threshold = current_threshold
+                                
                                 print(f"🔍 DEBUG: dontpick_count={dontpick_count}, threshold={current_threshold}, sos_triggered={dontpick_sos_triggered}")
                                 
                                 if (
@@ -612,6 +631,8 @@ def start_Serial_loop(
                                 # ถ้าสถานะไม่ใช่ fail
                                 # แจ้งเตือนเมื่อสถานะ complete (จ่ายยาสำเร็จ)
                                 if normalized_status == "complete" and status_changed:
+                                    # รีเซ็ต last_dontpick_count เมื่อสถานะเปลี่ยนเป็น complete
+                                    last_dontpick_count = 0
                                     if notification_callback:
                                         try:
                                             message = (
@@ -649,6 +670,16 @@ def start_Serial_loop(
 
                         print(f"Received dontpick count: {dontpick_count}")
 
+                        # เล่นเสียง dontpick เมื่อพบ dontpick status (เล่นทุกครั้งที่ dontpick_count เปลี่ยน)
+                        if dontpick_count > 0 and dontpick_count != last_dontpick_count:
+                            if sound_callback:
+                                try:
+                                    sound_callback("dontpick")
+                                    print(f"🔊 Playing dontpick sound (count: {dontpick_count})")
+                                except Exception as e:
+                                    print(f"Error playing dontpick sound: {e}")
+                            last_dontpick_count = dontpick_count
+
                         if status_var is not None:
                             try:
                                 status_var.set(normalized_special)
@@ -656,6 +687,13 @@ def start_Serial_loop(
                                 print(f"Error setting status_var with dontpick: {e}")
 
                         current_threshold = _get_effective_dont_pick_threshold()
+                        
+                        # รีเซ็ต dontpick_sos_triggered เมื่อ threshold เปลี่ยน (สำหรับ test mode)
+                        if current_threshold != last_threshold:
+                            print(f"🔄 Threshold changed from {last_threshold} to {current_threshold}, resetting SOS trigger flag")
+                            dontpick_sos_triggered = False
+                            last_threshold = current_threshold
+                        
                         if (
                             dontpick_count >= current_threshold
                             and not dontpick_sos_triggered

@@ -39,12 +39,12 @@ from pygame import mixer
 
 SONG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "song")
 VOICE_PROMPTS = {
-    "complete": {"text": "จ่ายยาสำเร็จครับ", "filename": "complete.mp3"},
-    "dontpick": {"text": "ผู้ป่วยกรุณารับยาด้วยครับ", "filename": "dontpick.mp3"},
-    "fail": {"text": "ดันยาไม่สำเร็จครับ", "filename": "fail.mp3"},
+    "complete": {"text": "จ่ายยาสำเร็จค่ะ", "filename": "complete.mp3"},
+    "dontpick": {"text": "ผู้ป่วยกรุณารับยาด้วยค่ะ", "filename": "dontpick.mp3"},
+    "fail": {"text": "ดันยาไม่สำเร็จค่ะ", "filename": "fail.mp3"},
 }
 STARTUP_GREETING = {
-    "text": "สวัสดีครับโฮมแคร์พร้อมให้บริการครับ",
+    "text": "สวัสดี โฮมแคร์พร้อมให้บริการค่ะ",
     "filename": "startup_greeting.mp3",
 }
 TEST_MODE_EMAIL = "siri@gmail.com"
@@ -5881,6 +5881,7 @@ class MainApp(ctk.CTk):
     # อัพเดตสถานะการจ่ายยา
     def status_callback(self,*args):
         new_status = str(self.device_status_var.get())
+        normalized_status = self._normalize_status_value(new_status)
         current_time = time.time()
 
         if normalized_status == "complete":
@@ -5895,7 +5896,7 @@ class MainApp(ctk.CTk):
                 else:
                     print(f"--- ทดสอบ --- (Duration {duration:.0f}s <= {alert_delay}m)")
             else:
-                print("Status: complete (จ่ายยาสำเร็จครับ)")
+                print("Status: complete (จ่ายยาสำเร็จค่ะ)")
 
             if getattr(self, 'voice_player', None):
                 self.voice_player.play("complete")
@@ -5905,12 +5906,12 @@ class MainApp(ctk.CTk):
             self._save_medicine_history("success")
 
         elif normalized_status == "fail":
-            print("Status: fail (จ่ายยาล้มเหลวครับ)")
+            print("Status: fail (จ่ายยาล้มเหลวค่ะ)")
             if getattr(self, 'voice_player', None):
                 self.voice_player.play("fail")
 
         elif normalized_status == "nopush":
-            print("Status: nopush (ยังไม่มีการดันยาครับ)")
+            print("Status: nopush (ยังไม่มีการดันยาค่ะ)")
 
         elif normalized_status:
             print(f"Status update: {normalized_status}")
