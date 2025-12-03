@@ -33,20 +33,18 @@ class NetworkMonitor(threading.Thread):
 
     # ⭐️ [แก้ไข] - เปลี่ยน Logic ภายในฟังก์ชันนี้
     def is_wifi_connected(self) -> bool:
-        """
-        ตรวจสอบสถานะการเชื่อมต่อ Internet (ทั้ง Wi-Fi และ LAN)
-        (หมายเหตุ: ชื่อฟังก์ชันคงเดิมตามที่ร้องขอ แต่ logic ถูกเปลี่ยนเป็นการเช็กเน็ต)
-        """
+     
         try:
-            # ใช้ HEAD request เพื่อความรวดเร็ว (ไม่ดึงเนื้อหา)
-            # ใช้ timeout เพื่อป้องกันการค้างนานหากเน็ตช้า
-            response = requests.head("https://www.google.com", timeout=5)
-            # ถ้า status code อยู่ในกลุ่ม 2xx หรือ 3xx ถือว่าเชื่อมต่อได้
+            response = requests.head("https://www.google.com", timeout=10)
             return response.status_code < 400
         except requests.RequestException:
-            # ไม่ว่าจะเป็น ConnectionError, Timeout, ฯลฯ
-            # ถ้าเกิด Exception แสดงว่าเชื่อมต่อไม่ได้
-            return False
+
+            try:
+                requests.head("https://1.1.1.1",timeout = 10)
+                return True
+            except requests.RequestException:
+                return False
+            
 
     def run(self):
 
