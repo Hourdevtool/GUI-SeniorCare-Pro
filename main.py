@@ -313,6 +313,39 @@ class login(ctk.CTkFrame):
         #pywinstyles.set_opacity(frame, value=0.9,color="#000001")
         # pywinstyles.set_opacity(frame, value=0.9 ,color="#000001")   # ถ้าใช้ pywinstyles
         
+        # === Toggle Mode (Caregiver/User) ===
+        self.login_mode_var = ctk.StringVar(value="user")
+
+        def toggle_login_mode():
+            if self.mode_switch.get() == 1:
+                self.login_mode_var.set("caregiver")
+                self.user_label.configure(text_color="#9E9E9E")
+                self.caregiver_label.configure(text_color="#2563EB")
+            else:
+                self.login_mode_var.set("user")
+                self.user_label.configure(text_color="#2563EB")
+                self.caregiver_label.configure(text_color="#9E9E9E")
+
+        toggle_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        toggle_frame.place(relx=0.08, rely=0.05, anchor="nw")
+
+        self.user_label = ctk.CTkLabel(toggle_frame, text="ผู้ใช้งานทั่วไป", font=("TH Sarabun New", 18, "bold"), text_color="#2563EB")
+        self.user_label.pack(side="left", padx=5)
+
+        self.mode_switch = ctk.CTkSwitch(
+            toggle_frame, 
+            text="", 
+            command=toggle_login_mode, 
+            onvalue=1, 
+            offvalue=0, 
+            width=40,
+            progress_color="#2563EB"
+        )
+        self.mode_switch.pack(side="left", padx=5)
+
+        self.caregiver_label = ctk.CTkLabel(toggle_frame, text="ผู้ดูแล", font=("TH Sarabun New", 18, "bold"), text_color="#9E9E9E")
+        self.caregiver_label.pack(side="left", padx=5)
+        
         # === โลโก้ในกล่องสี่เหลียมขอบมน (Logo Container) ===
         logo_frame = ctk.CTkFrame(
             frame,
@@ -323,22 +356,7 @@ class login(ctk.CTkFrame):
             border_width=1,
             border_color="#E0E0E0"
         )
-        logo_frame.grid(row=0, column=0, columnspan=2, pady=(40, 20))
-        
-        lang_button = ctk.CTkButton(
-            frame,  # หรือ parent ที่คุณต้องการวางปุ่ม
-            text="TH/EN",
-            width=50,
-            height=50,
-            corner_radius=10,
-            fg_color="#2563EB",
-            hover_color="#1D4ED8",
-            text_color="white",
-            font=("Arial", 10, "bold"),
-            command=toggle_language
-            )
-        lang_button.place(x=300, y=40)  # ปรับตำแหน่งตามต้องการ
-
+        logo_frame.grid(row=0, column=0, columnspan=2, pady=(80, 20))
         
         # === ไอคอนโลโก้ (Logo Icon) ===
         try:
@@ -353,6 +371,21 @@ class login(ctk.CTkFrame):
                 text_color="#666666"
             )
         logo_label.place(relx=0.5, rely=0.5, anchor="center")
+
+        # === ปุ่มเปลี่ยนภาษา (Language Toggle) ===
+        lang_button = ctk.CTkButton(
+            frame,
+            text="TH/EN",
+            width=50,
+            height=30,
+            corner_radius=10,
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
+            text_color="white",
+            font=("Arial", 10, "bold"),
+            command=toggle_language
+        )
+        lang_button.place(relx=0.95, rely=0.05, anchor="ne")
         
         # === หัวข้อหลัก (Main Title) ===
         ctk.CTkLabel(             
@@ -452,7 +485,7 @@ class login(ctk.CTkFrame):
         # === ฟังก์ชันการเข้าสู่ระบบ (Login Function) ===
         def save_and_go_home():             
             if len(self.username.get().strip()) == 0 or len(self.password.get().strip()) == 0:                 
-                print('กรุณากรอกข้อมูลให้ถูกต้องตามแบบฟอร์ม')                 
+                print('Please fill in the information correctly.')                 
                 return              
             
             # แสดงหน้าดาวโหลด
@@ -464,10 +497,15 @@ class login(ctk.CTkFrame):
                     
                     if result['status']:
                         self.controller.user = result['user']
+                        self.controller.login_mode() # Update test mode status
 
                         self.controller.network_status_var.set("online")
 
                         self.controller.start_network_monitor_service()
+                        
+                        # Save login mode
+                        result['user']['login_mode'] = self.login_mode_var.get()
+                        
                         with open('user_data.json', 'w', encoding='utf-8') as f:
                             json.dump(result['user'], f, ensure_ascii=False, indent=4, default=default_serializer)
 
@@ -519,6 +557,11 @@ class HomePage(ctk.CTkFrame):
         ):
             self.controller._startup_greeting_played = True
             self.controller.voice_player.play_startup_greeting()
+        # Re-create UI elements to adapt to login mode changes
+        self.create_medication_display()
+        self.create_user_info_display()
+        self.create_counter_medicine_display()
+
         # อัพเดทข้อมูลการตั้งค่ายาเมื่อแสดงหน้า
         self.update_medication_info()
         self.controller.start_background_polling()
@@ -785,10 +828,54 @@ class HomePage(ctk.CTkFrame):
                 self.battery_percent_label.configure(text="-- %")
 
     def create_menu_buttons(self, controller):
-        # ปรับขนาดปุ่มให้เล็กลง
-        self.menu_buttons.clear()
-        self.button_original_styles.clear()
+        # Clear existing buttons
+        if hasattr(self, 'menu_buttons'):
+            for btn in self.menu_buttons.values():
+                btn.destroy()
+        self.menu_buttons = {}
+        self.button_original_styles = {}
+        
+        # Check Login Mode
+        is_user_mode = False
+        if hasattr(self.controller, 'user') and self.controller.user:
+             is_user_mode = self.controller.user.get('login_mode') == 'user'
 
+        if is_user_mode:
+            # User Mode: Create a large logout button at the bottom
+            try:
+                logout_icon_path = f"{PATH}imgNew/iconout.png"
+                logout_img = Image.open(logout_icon_path).resize((100, 100), Image.Resampling.LANCZOS)
+                logout_photo = ImageTk.PhotoImage(logout_img)
+                
+                # Calculate center position
+                x_pos = (1024 - 150) // 2  # Center horizontally
+                y_pos = 620  # Bottom position
+                
+                logout_btn = ctk.CTkButton(
+                    self,
+                    image=logout_photo,
+                    text="ออกจากระบบ",
+                    compound="top",
+                    font=("TH Sarabun New", 28, "bold"),
+                    fg_color="#D32F2F",
+                    bg_color="#8acaef",
+                    hover_color="#B71C1C",
+                    text_color="white",
+                    border_width=3,
+                    border_color="#FFCDD2",
+                    width=150,
+                    height=100,
+                    corner_radius=15,
+                    command=self.confirm_logout
+                )
+                logout_btn.place(x=800, y=100)
+                logout_btn.image = logout_photo  # Keep reference
+                self.menu_buttons['logout'] = logout_btn
+            except Exception as e:
+                print(f"Error creating user logout button: {e}")
+            return
+
+        # Caregiver Mode: Show full menu
         btn_size = (100, 100)
         btn_images = {}
         pressure = 0
@@ -884,6 +971,7 @@ class HomePage(ctk.CTkFrame):
         response = messagebox.askyesno("ยืนยันออกจากระบบ", "คุณต้องการออกจากระบบหรือไม่?")
         if response:
             self.controller.stop_background_polling()
+            self.controller.user = None  # Clear user data to prevent stale state
             try:
                 if os.path.exists("user_data.json"):
                     os.remove("user_data.json")
@@ -902,11 +990,22 @@ class HomePage(ctk.CTkFrame):
                 os.system("sudo shutdown -h now")
 
     def create_medication_display(self):
+        if hasattr(self, 'medication_frame') and self.medication_frame:
+            self.medication_frame.destroy()
+
+        # Check Mode
+        is_user_mode = False
+        if hasattr(self.controller, 'user') and self.controller.user:
+             is_user_mode = self.controller.user.get('login_mode') == 'user'
+        
+        height_box = 500 if is_user_mode else 300
+        list_height = 400 if is_user_mode else 150
+
         # ปรับปรุงการแสดงข้อมูลยาให้สวยงาม
         self.medication_frame = ctk.CTkFrame(
             self,
             width=340,
-            height=300,
+            height=height_box,
             corner_radius=0,
             fg_color="#FFFFFF",
             bg_color="#000001",
@@ -943,56 +1042,57 @@ class HomePage(ctk.CTkFrame):
         )
         self.medication_title.place(x=30, y=10)
 
-        # ปุ่มควบคุม
-        self.refresh_button = ctk.CTkButton(
-            header_frame,
-            text="รีเซ็ต",
-            font=("TH Sarabun New", 20, "bold"),
-            fg_color="#f4b81a",
-            hover_color="#2D6A4F",
-            text_color="white",
-            corner_radius=8,
-            width=40,
-            height=25,
-            command=self.reset_and_update
-        )
-        self.refresh_button.place(x=250, y=8)
-        
-        # บันทึกสไตล์เดิมของปุ่มรีเซ็ต
-        self.refresh_button_original_style = {
-            'fg_color': "#f4b81a",
-            'hover_color': "#2D6A4F",
-            'text_color': "white",
-            'state': 'normal'
-        }
+        if not is_user_mode:
+            # ปุ่มควบคุม (แสดงเฉพาะ Caregiver)
+            self.refresh_button = ctk.CTkButton(
+                header_frame,
+                text="รีเซ็ต",
+                font=("TH Sarabun New", 20, "bold"),
+                fg_color="#f4b81a",
+                hover_color="#2D6A4F",
+                text_color="white",
+                corner_radius=8,
+                width=40,
+                height=25,
+                command=self.reset_and_update
+            )
+            self.refresh_button.place(x=250, y=8)
+            
+            # บันทึกสไตล์เดิมของปุ่มรีเซ็ต
+            self.refresh_button_original_style = {
+                'fg_color': "#f4b81a",
+                'hover_color': "#2D6A4F",
+                'text_color': "white",
+                'state': 'normal'
+            }
 
-        self.setting_button = ctk.CTkButton(
-            header_frame,
-            text="รีเฟรช",
-            font=("TH Sarabun New", 20, "bold"),
-            fg_color="#007BFF",
-            hover_color="#0056B3",
-            text_color="white",
-            corner_radius=8,
-            width=40,
-            height=25,
-            command=lambda: self.update_medication_info()
-        )
-        self.setting_button.place(x=160, y=8)
-        
-        # บันทึกสไตล์เดิมของปุ่มรีเฟรช
-        self.setting_button_original_style = {
-            'fg_color': "#007BFF",
-            'hover_color': "#0056B3",
-            'text_color': "white",
-            'state': 'normal'
-        }
+            self.setting_button = ctk.CTkButton(
+                header_frame,
+                text="รีเฟรช",
+                font=("TH Sarabun New", 20, "bold"),
+                fg_color="#007BFF",
+                hover_color="#0056B3",
+                text_color="white",
+                corner_radius=8,
+                width=40,
+                height=25,
+                command=lambda: self.update_medication_info()
+            )
+            self.setting_button.place(x=160, y=8)
+            
+            # บันทึกสไตล์เดิมของปุ่มรีเฟรช
+            self.setting_button_original_style = {
+                'fg_color': "#007BFF",
+                'hover_color': "#0056B3",
+                'text_color': "white",
+                'state': 'normal'
+            }
 
         # สร้างกรอบสำหรับแสดงรายการยา
         self.medication_list_frame = ctk.CTkScrollableFrame(
             self.medication_frame,
             width=310,
-            height=150,
+            height=list_height,
             fg_color="#F8F9FA",
             corner_radius=10,
             border_width=1,
@@ -1003,11 +1103,22 @@ class HomePage(ctk.CTkFrame):
         self.medication_labels = []
 
     def create_user_info_display(self):
+        if hasattr(self, 'user_info_frame') and self.user_info_frame:
+            self.user_info_frame.destroy()
+
+        # Check Mode
+        is_user_mode = False
+        if hasattr(self.controller, 'user') and self.controller.user:
+             is_user_mode = self.controller.user.get('login_mode') == 'user'
+        
+        height_box = 500 if is_user_mode else 300
+        content_height = 430 if is_user_mode else 230
+
         # ปรับปรุงการแสดงข้อมูลผู้ใช้ให้สวยงาม
         self.user_info_frame = ctk.CTkFrame(
             self,
             width=300,
-            height=300,
+            height=height_box,
             corner_radius=0,
             fg_color="#FFFFFF",
             bg_color="#000001",
@@ -1048,7 +1159,7 @@ class HomePage(ctk.CTkFrame):
         self.user_info_content = ctk.CTkScrollableFrame(
             self.user_info_frame,
             width=280,
-            height=230,
+            height=content_height,
             fg_color="#F8F9FA",
             corner_radius=10,
             border_width=1,
@@ -1059,10 +1170,21 @@ class HomePage(ctk.CTkFrame):
         self.user_info_labels = []
 
     def create_counter_medicine_display(self):
+        if hasattr(self, 'medicine_frame') and self.medicine_frame:
+            self.medicine_frame.destroy()
+
+        # Check Mode
+        is_user_mode = False
+        if hasattr(self.controller, 'user') and self.controller.user:
+             is_user_mode = self.controller.user.get('login_mode') == 'user'
+        
+        height_box = 500 if is_user_mode else 300
+        font_size = 120 if is_user_mode else 80
+
         self.medicine_frame = ctk.CTkFrame(
             self,
             width=300,
-            height=300,
+            height=height_box,
             corner_radius=0,
             fg_color="#FFFFFF",
             bg_color="#000001",
@@ -1071,7 +1193,17 @@ class HomePage(ctk.CTkFrame):
         )
         self.medicine_frame.place(x=20, y=280)
         #pywinstyles.set_opacity(self.medicine_frame, value=1, color="#000001")
+        
+        # Destroy previous test mode section if it exists
+        if hasattr(self, 'test_mode_section') and self.test_mode_section:
+            self.test_mode_section.destroy()
         self.test_mode_section = None
+        
+        # Destroy previous logout frame if it exists
+        if hasattr(self, 'logout_frame') and self.logout_frame:
+            self.logout_frame.destroy()
+        self.logout_frame = None
+
         self.test_mode_slider = None
         self.test_mode_value_label = None
     
@@ -1085,27 +1217,28 @@ class HomePage(ctk.CTkFrame):
         )
         header_frame.place(x=10, y=10)
         
-        self.reset_counter_button = ctk.CTkButton(
-            header_frame,
-            text="รีเซ็ต",
-            font=("TH Sarabun New", 20, "bold"),
-            fg_color="#f4b81a",
-            hover_color="#2D6A4F",
-            text_color="white",
-            corner_radius=8,
-            width=60,  # เพิ่มความกว้างให้ปุ่ม
-            height=25,
-            command=self.reset_medicine_count  # เอา lambda ออก
-        )
-        self.reset_counter_button.place(x=200, y=8)
-        
-        # บันทึกสไตล์เดิมของปุ่มรีเซ็ตจำนวนยา
-        self.reset_counter_button_original_style = {
-            'fg_color': "#f4b81a",
-            'hover_color': "#2D6A4F",
-            'text_color': "white",
-            'state': 'normal'
-        }
+        if not is_user_mode:
+            self.reset_counter_button = ctk.CTkButton(
+                header_frame,
+                text="รีเซ็ต",
+                font=("TH Sarabun New", 20, "bold"),
+                fg_color="#f4b81a",
+                hover_color="#2D6A4F",
+                text_color="white",
+                corner_radius=8,
+                width=60,  # เพิ่มความกว้างให้ปุ่ม
+                height=25,
+                command=self.reset_medicine_count  # เอา lambda ออก
+            )
+            self.reset_counter_button.place(x=200, y=8)
+            
+            # บันทึกสไตล์เดิมของปุ่มรีเซ็ตจำนวนยา
+            self.reset_counter_button_original_style = {
+                'fg_color': "#f4b81a",
+                'hover_color': "#2D6A4F",
+                'text_color': "white",
+                'state': 'normal'
+            }
 
         self.medicine_title = ctk.CTkLabel(
             header_frame,
@@ -1116,7 +1249,7 @@ class HomePage(ctk.CTkFrame):
         )
         self.medicine_title.place(x=10, y=10)
 
-        # เริ่มต้นค่าตัวแปรสำหรับเก็บจำนวนยา - แก้ไข typo 'uset' เป็น 'user'
+        # เริ่มต้นค่าตัวแปรสำหรับเก็บจำนวนยา
         if hasattr(self.controller, 'user') and self.controller.user and 'count_medicine' in self.controller.user:
             self.medicine_count = self.controller.user['count_medicine']
         else:
@@ -1130,14 +1263,17 @@ class HomePage(ctk.CTkFrame):
             height=150,
             fg_color="#F8F9FA",
             corner_radius=10,
-            font=("TH Sarabun New", 80, "bold"),
+            font=("TH Sarabun New", font_size, "bold"),
             text_color="#2E7D32"
         )
         self.counter_medicine.place(x=25, y=60)
         
-        print(f"สร้างส่วนแสดงจำนวนยาคงเหลือเสร็จสิ้น: {self.medicine_count} เม็ด")
-        self._build_test_mode_controls()
-    
+        print(f"Medicine counter display created: {self.medicine_count} pills")
+        
+        # แสดง Test Mode สำหรับผู้ดูแล (Caregiver)
+        if not is_user_mode:
+            self._build_test_mode_controls()
+
     def _build_test_mode_controls(self):
         if self.test_mode_section is not None:
             return
@@ -1944,7 +2080,8 @@ class HomePage(ctk.CTkFrame):
         # เปลี่ยนรูปปุ่มเป็น sos-ค้าง.png และปิดการใช้งาน
         self.call_button.configure(
             image=self.call_photo_clicked,
-            state="disabled"
+            state="disabled",
+            fg_color="#2ECC71"  # เปลี่ยนเป็นสีเขียวเมื่อกด
         )
 
         try:
@@ -1973,13 +2110,8 @@ class HomePage(ctk.CTkFrame):
                 finally:
                     # ซ่อน loading screen
                     self.controller.after(0, self.controller.hide_loading)
-                    # รีเซ็ตปุ่ม SOS หลังจากโทรเสร็จแล้ว เพื่อให้สามารถกดได้อีกครั้ง
-                    # รอ 3 วินาทีเพื่อให้ผู้ใช้เห็นว่าการโทรเสร็จแล้ว
-                    import threading
-                    def reset_after_delay():
-                        time.sleep(3)
-                        self.controller.after(0, self.reset_sos_button)
-                    threading.Thread(target=reset_after_delay, daemon=True).start()
+                    # รีเซ็ตปุ่ม SOS หลังจากโทรเสร็จแล้ว (เมื่อปิด browser)
+                    self.controller.after(0, self.reset_sos_button)
             
 
             threading.Thread(target=call_thread, daemon=True).start()
@@ -5319,14 +5451,19 @@ class MainApp(ctk.CTk):
                     monitor_interval=10
                 )
                 self.network_monitor.start()
-                print(f"✅ Started Network Monitor for Device ID: {id_to_monitor}")
+                print(f"Started Network Monitor for Device ID: {id_to_monitor}")
             else:
-                 print("❌ Cannot start Network Monitor: 'id' not found in self.user.")
+                 print("Cannot start Network Monitor: 'id' not found in self.user.")
         else:
-            print("⚠️ self.user not defined or loaded yet. Network Monitor not started.")
-        # ---------------------------------------------------
+            print("self.user not defined or loaded yet. Network Monitor not started.")
 
-
+    def login_mode(self):
+        if self.user and self.user.get('email') == TEST_MODE_EMAIL:
+            self.is_test_account = True
+            print("Test Mode Activate")
+        else:
+            self.is_test_account = False
+            print("User Mode Activate")
     def fetch_medications(self, show_loading_screen=True, on_complete_callback=None):
        
         
@@ -5456,22 +5593,36 @@ class MainApp(ctk.CTk):
         
         new_status = "online" if is_connected else "offline"
         self.network_status_var.set(new_status)
-        info_frame = None
-        for frame_instance in self.frames.values():
-            if hasattr(frame_instance, 'entry_status'):
-                info_frame = frame_instance
-                break
         
-        if info_frame:
-            entry = info_frame.entry_status
-            new_color = "#2E7D32" if is_connected else "#D32F2F"
-            try:
-                entry.configure(state='normal')
-                entry.delete(0, ctk.END)
-                entry.insert(0, new_status) 
-                entry.configure(state='disabled', text_color=new_color)
-            except Exception as e:
-                print(f"❌ Error updating entry_status in GUI: {e}")
+        # ⭐ อัปเดต UI ทันทีเมื่อสถานะเครือข่ายเปลี่ยน
+        print(f"🔄 Network status changed: {old_status} -> {new_status}")
+        
+        # อัปเดต HomePage UI ทันที
+        if hasattr(self, 'frames') and HomePage in self.frames:
+            home_page = self.frames[HomePage]
+            if hasattr(home_page, 'check_network_and_update_buttons'):
+                try:
+                    home_page.check_network_and_update_buttons()
+                    print(f"✅ Updated HomePage UI for network status: {new_status}")
+                except Exception as e:
+                    print(f"❌ Error updating HomePage UI: {e}")
+        
+        # info_frame = None
+        # for frame_instance in self.frames.values():
+        #     if hasattr(frame_instance, 'entry_status'):
+        #         info_frame = frame_instance
+        #         break
+        
+        # if info_frame:
+        #     entry = info_frame.entry_status
+        #     new_color = "#2E7D32" if is_connected else "#D32F2F"
+        #     try:
+        #         entry.configure(state='normal')
+        #         entry.delete(0, ctk.END)
+        #         entry.insert(0, new_status) 
+        #         entry.configure(state='disabled', text_color=new_color)
+        #     except Exception as e:
+        #         print(f"❌ Error updating entry_status in GUI: {e}")
 
 
         if new_status == "online" and not self.has_sent_online_notification:
@@ -5488,9 +5639,9 @@ class MainApp(ctk.CTk):
                     tg_id = self.user.get('telegram_id')
 
                     line_message = (
-                        f"[SeniorCare Pro]\n"
-                        f"เครื่องจ่ายยา (ID: {device_id})\n"
-                        f"สำหรับคุณ: {user_name}\n"
+                        f"[SeniorCare Pro]\\n"
+                        f"เครื่องจ่ายยา (ID: {device_id})\\n"
+                        f"สำหรับคุณ: {user_name}\\n"
                         f"ได้เชื่อมต่ออินเทอร์เน็ตและพร้อมใช้งานแล้ว"
                     )
 
@@ -6042,14 +6193,14 @@ class MainApp(ctk.CTk):
                         home_frame.update_test_mode_visibility()
                     self.show_frame(login)
             except Exception as e:
-                print(f"เกิดข้อผิดพลาดขณะโหลด user_data.json: {e}")
+                print(f"Error loading user_data.json: {e}")
                 self.is_test_account = False
                 home_frame = self.frames.get(HomePage)
                 if home_frame:
                     home_frame.update_test_mode_visibility()
                 self.show_frame(login)
         else:
-            print("ไม่พบไฟล์ user_data.json - แสดงหน้า login")
+            print("user_data.json not found - showing login page")
             self.is_test_account = False
             home_frame = self.frames.get(HomePage)
             if home_frame:
@@ -6059,15 +6210,15 @@ class MainApp(ctk.CTk):
 
     def start_network_monitor_service(self):
         if not self.user or 'id' not in self.user:
-            print("❌ Cannot start Network Monitor: No user ID.")
+            print("Cannot start Network Monitor: No user ID.")
             return
 
         if hasattr(self, 'network_monitor') and self.network_monitor.is_alive():
-            print("⚠️ Network Monitor is already running.")
+            print("Network Monitor is already running.")
             return
 
         try:
-            print(f"✅ Starting Network Monitor for Device ID: {self.user['id']}")
+            print(f"Starting Network Monitor for Device ID: {self.user['id']}")
             self.network_monitor = NetworkMonitor(
                 id=self.user['id'], 
                 ui_callback=self._async_update_wifi_status,
@@ -6075,7 +6226,7 @@ class MainApp(ctk.CTk):
             )
             self.network_monitor.start()
         except Exception as e:
-            print(f"❌ Failed to start Network Monitor: {e}")
+            print(f"Failed to start Network Monitor: {e}")
     def _lift_frame(self, frame_class, call_on_show=True):
         """ยก frame ขึ้นมาแสดง โดยเลือกได้ว่าจะเรียก on_show หรือไม่"""
         try:
@@ -6159,10 +6310,10 @@ class MainApp(ctk.CTk):
                 self.network_monitor.join() 
             # ------------------------------------------
             
-            print("กำลังปิดแอปพลิเคชัน...")
+            print("Closing application...")
             self.destroy()
         except Exception as e:
-            print(f"เกิดข้อผิดพลาดขณะปิดแอปพลิเคชัน: {e}")
+            print(f"Error closing application: {e}")
             self.destroy()
 
 
@@ -6179,11 +6330,11 @@ def main():
         app.bind('<F11>', lambda e: app.toggle_fullscreen())
         app.bind('<Escape>', lambda e: app.exit_fullscreen())
         
-        print("เริ่มต้นแอปพลิเคชัน SeniorCare Pro")
+        print("Starting SeniorCare Pro application")
         app.mainloop()
         
     except Exception as e:
-        print(f"เกิดข้อผิดพลาดขณะรันแอปพลิเคชัน: {e}")
+        print(f"Error running application: {ascii(e)}")
 
 
 if __name__ == "__main__":
