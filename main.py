@@ -537,6 +537,9 @@ class HomePage(ctk.CTkFrame):
         self.create_menu_buttons(self.controller)
 
         self.check_network_and_update_buttons()
+        
+        # รีเซ็ตปุ่ม SOS เมื่อกลับมาที่หน้า HomePage เพื่อให้สามารถกดได้อีกครั้ง
+        self.reset_sos_button()
        
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -547,6 +550,7 @@ class HomePage(ctk.CTkFrame):
         self.call_button_original_style = None
         self._last_checked_network_status = None
         self._battery_received = False  # Flag ว่าเคยได้รับค่าแบตเตอรี่จริงหรือยัง
+        self.sos_button_clicked = False  # Flag สำหรับป้องกันการกดปุ่ม SOS ซ้ำ
 
         # พื้นหลัง (ปรับขนาดเป็น 1024x600)
         bg_image = Image.open(f"{PATH}image/home.png").resize((1024, 800), Image.Resampling.LANCZOS)
@@ -622,12 +626,15 @@ class HomePage(ctk.CTkFrame):
             # อัพเดตครั้งแรก
             self.update_battery_display()
         
-        # โหลดรูป SOS ทั้งสองแบบ (ออนไลน์และออฟไลน์)
-        call_button_online = Image.open(f"{PATH}imgNew/sos.png").resize((100, 100), Image.Resampling.LANCZOS)
+        # โหลดรูป SOS ทั้งสามแบบ (ออนไลน์, ออฟไลน์, และค้าง)
+        call_button_online = Image.open(f"{PATH}imgNew/sos.png").resize((200, 200), Image.Resampling.LANCZOS)
         self.call_photo_online = ImageTk.PhotoImage(call_button_online)
         
-        call_button_offline = Image.open(f"{PATH}imgNew/sos-offline.png").resize((100, 100), Image.Resampling.LANCZOS)
+        call_button_offline = Image.open(f"{PATH}imgNew/sos-offline.png").resize((200, 200), Image.Resampling.LANCZOS)
         self.call_photo_offline = ImageTk.PhotoImage(call_button_offline)
+        
+        call_button_clicked = Image.open(f"{PATH}imgNew/sos-ค้าง.png").resize((200, 200), Image.Resampling.LANCZOS)
+        self.call_photo_clicked = ImageTk.PhotoImage(call_button_clicked)
         
         # ใช้รูปออนไลน์เป็นค่าเริ่มต้น
         self.call_photo = self.call_photo_online
@@ -645,11 +652,11 @@ class HomePage(ctk.CTkFrame):
             bg_color=sos_bg_color,
             fg_color=sos_fg_color,
             hover_color=sos_hover_color,
-            width=100,
+            width=200,
             border_width=0,  # เพิ่มขอบให้ดูสวยงาม
             border_color=sos_border_color,
             corner_radius=0,  # มุมโค้งมน
-            height=100,
+            height=200,
             command=self.on_video_call_click
         )
         self.call_button.place(x=550, y=35)
@@ -664,6 +671,34 @@ class HomePage(ctk.CTkFrame):
             'corner_radius': 0,
             'state': 'normal'
         } 
+
+    def reset_sos_button(self):
+        """รีเซ็ตสถานะปุ่ม SOS ให้สามารถกดได้อีกครั้ง"""
+        if not hasattr(self, 'call_button') or not self.call_button:
+            return
+        
+        self.sos_button_clicked = False
+        
+        # ตรวจสอบสถานะเครือข่ายเพื่อเลือกรูปภาพที่เหมาะสม
+        if hasattr(self.controller, 'network_status_var'):
+            is_online = self.controller.network_status_var.get() == "online"
+            photo = self.call_photo_online if is_online else self.call_photo_offline
+        else:
+            photo = self.call_photo_online
+        
+        # คืนค่าปุ่ม SOS เป็นสไตล์เดิม
+        if self.call_button_original_style:
+            style = self.call_button_original_style
+            self.call_button.configure(
+                state=style['state'],
+                image=photo,
+                fg_color=style['fg_color'],
+                hover_color=style['hover_color'],
+                bg_color=style['bg_color'],
+                border_color=style['border_color'],
+                border_width=style['border_width'],
+                corner_radius=style.get('corner_radius', 0)
+            )
 
     def update_battery_display(self, *args):
         """อัพเดตการแสดงผลแบตเตอรี่ตามค่า battery_percent_var"""
@@ -1095,7 +1130,7 @@ class HomePage(ctk.CTkFrame):
             height=150,
             fg_color="#F8F9FA",
             corner_radius=10,
-            font=("TH Sarabun New", 48, "bold"),
+            font=("TH Sarabun New", 80, "bold"),
             text_color="#2E7D32"
         )
         self.counter_medicine.place(x=25, y=60)
@@ -1107,10 +1142,10 @@ class HomePage(ctk.CTkFrame):
         if self.test_mode_section is not None:
             return
 
-        self._test_mode_position = {"x": 700, "y": 120}
+        self._test_mode_position = {"x": 780, "y": 120}
         self.test_mode_section = ctk.CTkFrame(
             self,
-            width=300,
+            width=230,
             height=120,
             corner_radius=0,
             fg_color="#E8F4FD",
@@ -1147,7 +1182,7 @@ class HomePage(ctk.CTkFrame):
             font=("TH Sarabun New",20, "bold"),
             text_color="#1D3557",
         )
-        slider_label.place(x=150, y=28)
+        slider_label.place(x=130, y=28)
 
         self.test_mode_value_label = ctk.CTkLabel(
             self.test_mode_section,
@@ -1155,7 +1190,7 @@ class HomePage(ctk.CTkFrame):
             font=("TH Sarabun New", 20, "bold"),
             text_color="#1D3557",
         )
-        self.test_mode_value_label.place(x=150, y=75)
+        self.test_mode_value_label.place(x=130, y=75)
 
         self.test_mode_slider = ctk.CTkSlider(
             self.test_mode_section,
@@ -1163,9 +1198,9 @@ class HomePage(ctk.CTkFrame):
             to=6,
             number_of_steps=5,
             command=self._on_test_mode_slider_change,
-            width=120,
+            width=80,
         )
-        self.test_mode_slider.place(x=150, y=50)
+        self.test_mode_slider.place(x=130, y=50)
         self._sync_test_mode_slider()
 
     def _trigger_test_mode_dispense(self):
@@ -1269,9 +1304,11 @@ class HomePage(ctk.CTkFrame):
                     line_group = self.controller.user.get('group_id')
                     
                     if line_token and line_group:
+                        current_time = datetime.now().strftime('%H:%M')
                         message = (
-                            "🔄 [SeniorCare Pro] แจ้งเตือน : จ่ายยาครบ 28 รอบ\n\n"
-                            "เครื่องได้ทำการรีเซ็ตตำแหน่งเริ่มต้นเรียบร้อยแล้ว\n"
+                            "🔄 [SeniorCare Pro] แจ้งเตือน : จ่ายยาครบ 28 รอบ\n"
+                            "━━━━━━━━━━━━━━━━━━\n\n"
+                            "เครื่องได้ทำการรีเซ็ตตำแหน่งเริ่มต้นเรียบร้อยแล้ว\n\n"
                             "กรุณาเติมยาและตรวจสอบความเรียบร้อย"
                         )
                         # ใช้ sendtoLineWithDeduplication ผ่าน thread แยก (หรือเรียกผ่าน alert โดยตรง)
@@ -1893,11 +1930,22 @@ class HomePage(ctk.CTkFrame):
                     )
 
     def on_video_call_click(self):
+        # ตรวจสอบว่าปุ่มถูกกดไปแล้วหรือไม่
+        if self.sos_button_clicked:
+            print("SOS button already clicked, ignoring duplicate click")
+            return
         
         if self.controller.network_status_var.get() == "offline":
              return 
 
-
+        # ป้องกันการกดซ้ำ - ตั้งค่าสถานะและเปลี่ยนรูปเป็น sos-ค้าง.png
+        self.sos_button_clicked = True
+        
+        # เปลี่ยนรูปปุ่มเป็น sos-ค้าง.png และปิดการใช้งาน
+        self.call_button.configure(
+            image=self.call_photo_clicked,
+            state="disabled"
+        )
 
         try:
             token = self.controller.user['token_line']
@@ -1923,8 +1971,15 @@ class HomePage(ctk.CTkFrame):
                     print(f"Failed to run SOS automation thread: {e}")
                     self.controller.after(0, lambda: self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False))
                 finally:
-                  
+                    # ซ่อน loading screen
                     self.controller.after(0, self.controller.hide_loading)
+                    # รีเซ็ตปุ่ม SOS หลังจากโทรเสร็จแล้ว เพื่อให้สามารถกดได้อีกครั้ง
+                    # รอ 3 วินาทีเพื่อให้ผู้ใช้เห็นว่าการโทรเสร็จแล้ว
+                    import threading
+                    def reset_after_delay():
+                        time.sleep(3)
+                        self.controller.after(0, self.reset_sos_button)
+                    threading.Thread(target=reset_after_delay, daemon=True).start()
             
 
             threading.Thread(target=call_thread, daemon=True).start()
