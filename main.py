@@ -278,6 +278,139 @@ TITLE_FONT_SIZE = 30          # ลดจาก 56
 SECTION_TITLE_SIZE = 22
 LABEL_FONT_FAMILY = "Arial"
 
+# ===== Role-Based Theme System =====
+# ระบบแต่งตกแยกตามระดับผู้ใช้ (Admin, User, Patient)
+ROLE_THEMES = {
+    'admin': {
+        'name': 'ผู้ดูแลระบบ',
+        'button': {
+            'fg_color': '#F8FAFC',         # สีน้ำเงินจางลง - ดูนุ่มนวลขึ้น
+            'hover_color': '#5A9BC4',      # สีน้ำเงินเข้มขึ้นเล็กน้อยเมื่อ hover
+            'text_color': 'black',       # ข้อความสีขาว
+            'border_color': '#5CA95C',     # ขอบสีน้ำเงินอ่อน
+            'border_width': 2,
+            'corner_radius': 0
+        },
+        'frame': {
+            'fg_color': '#FFFFFF',         # พื้นหลังสีขาว
+            'bg_color': '#000001',          # พื้นหลังหลัก
+            'border_color': '#E2E8F0',     # ขอบสีเทาอ่อน
+            'border_width': 2
+        },
+        'info_box': {
+            'fg_color': '#F7FAFC',         # พื้นหลังกล่องข้อมูล
+            'border_color': '#CBD5E0',     # ขอบกล่องข้อมูล
+            'header_color': '#EDF2F7'      # สีหัวข้อ
+        },
+        'accent': '#2563EB',               # สีเน้น (น้ำเงิน)
+        'layout': {
+            'medicine_frame': {'x': 20, 'y': 280, 'width': 300, 'height': 300},
+            'medication_frame': {'x': 340, 'y': 280, 'width': 340, 'height': 300},
+            'user_info_frame': {'x': 700, 'y': 280, 'width': 300, 'height': 300},
+            'menu_buttons': {'start_x': 30, 'start_y': 600, 'spacing': 40, 'btn_width': 100, 'btn_height': 90}
+        }
+    },
+    'user': {
+        'name': 'ผู้ใช้งาน',
+        'button': {
+            'fg_color': '#F8FAFC',         # สีน้ำเงินจางลง - ดูนุ่มนวลขึ้น
+            'hover_color': '#5A9BC4',      # สีน้ำเงินเข้มขึ้นเล็กน้อยเมื่อ hover
+            'text_color': 'black',       # ข้อความสีขาว
+            'border_color': '#5CA95C',     # ขอบสีน้ำเงินอ่อน
+            'border_width': 2,
+            'corner_radius': 0
+        },
+        'frame': {
+            'fg_color': '#FFFFFF',         # พื้นหลังสีขาว
+            'bg_color': '#000001',         # พื้นหลังหลัก
+            'border_color': '#B8D4F0',     # ขอบสีน้ำเงินอ่อน
+            'border_width': 2
+        },
+        'info_box': {
+            'fg_color': '#E8F4FD',         # พื้นหลังกล่องข้อมูล (น้ำเงินอ่อน)
+            'border_color': '#A8DADC',     # ขอบกล่องข้อมูล
+            'header_color': '#D1ECF1'      # สีหัวข้อ
+        },
+        'accent': '#2F6AA3',               # สีเน้น (น้ำเงิน)
+        'layout': {
+            'medicine_frame': {'x': 20, 'y': 280, 'width': 300, 'height': 300},
+            'medication_frame': {'x': 340, 'y': 280, 'width': 340, 'height': 300},
+            'user_info_frame': {'x': 700, 'y': 280, 'width': 300, 'height': 300},
+            'menu_buttons': {'start_x':60, 'start_y': 600, 'spacing': 100, 'btn_width': 100, 'btn_height': 90}
+        }
+    },
+    'patient': {
+        'name': 'ผู้ป่วย',
+        'button': {
+            'fg_color': '#FFFFFF',         # สีขาว - ดูสะอาด
+            'hover_color': '#E9ECEF',      # สีเทาอ่อนเมื่อ hover
+            'text_color': '#1D3557',       # ข้อความสีน้ำเงินเข้ม
+            'border_color': '#A8DADC',     # ขอบสีฟ้าอ่อน
+            'border_width': 2,
+            'corner_radius': 0
+        },
+        'frame': {
+            'fg_color': '#FFFFFF',         # พื้นหลังสีขาว
+            'bg_color': '#000001',         # พื้นหลังหลัก
+            'border_color': '#E8F4FD',     # ขอบสีฟ้าอ่อนมาก
+            'border_width': 2
+        },
+        'info_box': {
+            'fg_color': '#F8F9FA',         # พื้นหลังกล่องข้อมูล
+            'border_color': '#DEE2E6',     # ขอบกล่องข้อมูล
+            'header_color': '#E8F4FD'      # สีหัวข้อ
+        },
+        'accent': '#8acaef',               # สีเน้น (ฟ้าอ่อน)
+        'layout': {
+            # ปรับตำแหน่งและขนาดให้เหมาะสมกับหน้าจอ 1024x600
+            # จำนวนยาคงเหลือ - ด้านซ้าย, ขนาดใหญ่ขึ้น
+            'medicine_frame': {'x': 20, 'y': 280, 'width': 360, 'height': 280},
+            # การตั้งค่ายา - ตรงกลาง, ขนาดใหญ่ขึ้น
+            'medication_frame': {'x': 400, 'y': 280, 'width': 600, 'height': 280},
+            # ข้อมูลผู้ใช้ - ด้านขวา, ขนาดใหญ่ขึ้น
+            'user_info_frame': {'x': 20, 'y': 570, 'width': 850, 'height': 220},
+            # ปุ่มเมนู - ปรับตำแหน่งให้อยู่ด้านล่าง
+            'menu_buttons': {'start_x': 910, 'start_y': 570, 'btn_width': 100, 'btn_height': 90}
+        }
+    }
+}
+
+def get_role_theme(role=None):
+    """
+    ดึง theme ตาม role ที่กำหนด
+    ถ้าไม่ระบุ role จะใช้ role จาก controller.user
+    """
+    if role is None:
+        # พยายามดึง role จาก controller ถ้ามี
+        try:
+            import inspect
+            frame = inspect.currentframe()
+            # หา controller จาก frame
+            for frame_info in inspect.stack():
+                local_vars = frame_info.frame.f_locals
+                if 'self' in local_vars and hasattr(local_vars['self'], 'controller'):
+                    controller = local_vars['self'].controller
+                    if hasattr(controller, 'user') and controller.user:
+                        role = controller.user.get('urole', '').lower()
+                        break
+        except:
+            pass
+    
+    if role is None:
+        role = 'patient'  # default
+    
+    role = role.lower()
+    if role not in ROLE_THEMES:
+        role = 'patient'  # fallback to patient
+    
+    return ROLE_THEMES[role]
+
+def get_user_role_from_controller(controller):
+    """ดึง role จาก controller"""
+    if hasattr(controller, 'user') and controller.user:
+        return controller.user.get('urole', '').lower()
+    return 'patient'  # default
+
 class login(ctk.CTkFrame):     
     def on_show(self):         
         print("login is now visible")     
@@ -313,38 +446,13 @@ class login(ctk.CTkFrame):
         #pywinstyles.set_opacity(frame, value=0.9,color="#000001")
         # pywinstyles.set_opacity(frame, value=0.9 ,color="#000001")   # ถ้าใช้ pywinstyles
         
-        # === Toggle Mode (Caregiver/User) ===
-        self.login_mode_var = ctk.StringVar(value="user")
-
-        def toggle_login_mode():
-            if self.mode_switch.get() == 1:
-                self.login_mode_var.set("caregiver")
-                self.user_label.configure(text_color="#9E9E9E")
-                self.caregiver_label.configure(text_color="#2563EB")
-            else:
-                self.login_mode_var.set("user")
-                self.user_label.configure(text_color="#2563EB")
-                self.caregiver_label.configure(text_color="#9E9E9E")
-
-        toggle_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        toggle_frame.place(relx=0.08, rely=0.05, anchor="nw")
-
-        self.user_label = ctk.CTkLabel(toggle_frame, text="ผู้ใช้งานทั่วไป", font=("TH Sarabun New", 18, "bold"), text_color="#2563EB")
-        self.user_label.pack(side="left", padx=5)
-
-        self.mode_switch = ctk.CTkSwitch(
-            toggle_frame, 
-            text="", 
-            command=toggle_login_mode, 
-            onvalue=1, 
-            offvalue=0, 
-            width=40,
-            progress_color="#2563EB"
-        )
-        self.mode_switch.pack(side="left", padx=5)
-
-        self.caregiver_label = ctk.CTkLabel(toggle_frame, text="ผู้ดูแล", font=("TH Sarabun New", 18, "bold"), text_color="#9E9E9E")
-        self.caregiver_label.pack(side="left", padx=5)
+        # === เลือกระดับผู้ใช้ (User Role Selection) - ตกแต่งให้สวยงาม ===
+        # (จะย้ายไปไว้หลังคำอธิบาย)
+        self.user_role_var = ctk.StringVar(value="patient")
+        
+        # === ตัวแปรเก็บข้อมูล (Data Variables) ===
+        self.username = ctk.StringVar()         
+        self.password = ctk.StringVar()          
         
         # === โลโก้ในกล่องสี่เหลียมขอบมน (Logo Container) ===
         logo_frame = ctk.CTkFrame(
@@ -356,7 +464,7 @@ class login(ctk.CTkFrame):
             border_width=1,
             border_color="#E0E0E0"
         )
-        logo_frame.grid(row=0, column=0, columnspan=2, pady=(80, 20))
+        logo_frame.grid(row=1, column=0, columnspan=2, pady=(20, 20))
         
         # === ไอคอนโลโก้ (Logo Icon) ===
         try:
@@ -393,7 +501,7 @@ class login(ctk.CTkFrame):
             text="ลงชื่อเข้าใช้ด้วยอีเมล",             
             font=("Arial", 28, "bold"),             
             text_color="#1a1a1a",         
-        ).grid(row=1, column=0, columnspan=2, pady=(20, 10))     
+        ).grid(row=2, column=0, columnspan=2, pady=(20, 10))     
         
         # === คำอธิบาย (Description) ===
         ctk.CTkLabel(             
@@ -402,15 +510,91 @@ class login(ctk.CTkFrame):
             font=("Arial", 14),             
             text_color="#666666",
             justify="center"         
-        ).grid(row=2, column=0, columnspan=2, pady=(0, 30))
+        ).grid(row=3, column=0, columnspan=2, pady=(0, 20))
         
-        # === ตัวแปรเก็บข้อมูล (Data Variables) ===
-        self.username = ctk.StringVar()         
-        self.password = ctk.StringVar()          
+        # === เลือกระดับผู้ใช้ (User Role Selection) แบบภาพตัวอย่าง ===
+        role_container = ctk.CTkFrame(
+            frame,
+            fg_color="#E7F5FF",        # พื้นหลังฟ้าอ่อน
+            corner_radius=15,
+            border_width=1,
+            border_color="#8acbff"
+        )
+        role_container.grid(row=4, column=0, columnspan=2, pady=(0, 20), padx=30, sticky="ew")
+        role_container.grid_columnconfigure(0, weight=1)
+
+
+        # === Header ข้างบนเหมือนภาพ ===
+        header_frame = ctk.CTkFrame(
+            role_container,
+            fg_color="#D9F0FF",        # สีหัวข้อฟ้าอ่อนกว่า
+            corner_radius=10,
+            height=48
+        )
+        header_frame.pack(fill="x", padx=10, pady=(10, 5))
+
+        # ไอคอน + ข้อความ
+        icon_label = ctk.CTkLabel(
+            header_frame,
+            text="👤",
+            font=("Arial", 20),
+            text_color="#1D3557"
+        )
+        icon_label.pack(side="left", padx=(15, 8), pady=10)
+
+        title_label = ctk.CTkLabel(
+            header_frame,
+            text="เลือกระดับผู้ใช้",
+            font=("TH Sarabun New", 20, "bold"),
+            text_color="#1D3557"
+        )
+        title_label.pack(side="left", pady=10)
+        
+        # === กรอบสำหรับ Combobox สไตล์เหมือนภาพ ===
+        cb_frame = ctk.CTkFrame(
+            role_container,
+            fg_color="#BEE3FF",    # สีพื้นหลังฟ้าใส
+            corner_radius=12
+        )
+        cb_frame.pack(fill="x", padx=10, pady=(5, 15))
+        cb_frame.grid_columnconfigure(0, weight=1)
+        
+        # Mapping ระหว่างชื่อภาษาไทยกับค่า urole
+        self.role_mapping = {
+            "ผู้ป่วย": "patient",
+            "ผู้ใช้งาน": "user",
+            "ผู้ดูแล": "admin"
+        }
+        
+        # ==== Combobox (ตกแต่งให้เหมือนภาพ) ====
+        self.role_combobox = ctk.CTkComboBox(
+            cb_frame,
+            values=["ผู้ป่วย", "ผู้ใช้งาน", "ผู้ดูแล"],
+            variable=self.user_role_var,
+            font=("TH Sarabun New", 20, "bold"),
+            width=260,
+            height=40,
+            dropdown_font=("TH Sarabun New", 18),
+
+            fg_color="#FFFFFF",
+            button_color="#8acbff",
+            button_hover_color="#6fb3e8",
+
+            border_color="#8acbff",
+            border_width=1,
+            corner_radius=10,
+
+            text_color="#1D3557",
+            dropdown_fg_color="#FFFFFF",
+            dropdown_text_color="#1D3557",
+            dropdown_hover_color="#E5F4FF"
+        )
+        self.role_combobox.grid(row=0, column=0, padx=15, pady=10, sticky="ew")
+        self.role_combobox.set("ผู้ป่วย")
         
         # === ช่องกรอกอีเมล - แก้ไขส่วนนี้ ===
         email_frame = ctk.CTkFrame(frame, fg_color="#F8F9FA", corner_radius=8, height=50)
-        email_frame.grid(row=3, column=0, columnspan=2, padx=30, pady=(0, 15), sticky="ew")
+        email_frame.grid(row=5, column=0, columnspan=2, padx=30, pady=(0, 15), sticky="ew")
         email_frame.grid_columnconfigure(1, weight=1)
 
         email_icon = Image.open(f"{PATH}image/email.png").resize((24, 24), Image.Resampling.LANCZOS)
@@ -433,7 +617,7 @@ class login(ctk.CTkFrame):
         
         # === ช่องกรอกรหัสผ่าน - แก้ไขส่วนนี้ ===
         password_frame = ctk.CTkFrame(frame, fg_color="#F8F9FA", corner_radius=8, height=50)
-        password_frame.grid(row=4, column=0, columnspan=2, padx=30, pady=(0, 15), sticky="ew")
+        password_frame.grid(row=6, column=0, columnspan=2, padx=30, pady=(0, 15), sticky="ew")
         password_frame.grid_columnconfigure(1, weight=1)
 
         padlock_icon = Image.open(f"{PATH}image/padlock.png").resize((24, 24), Image.Resampling.LANCZOS)
@@ -503,8 +687,11 @@ class login(ctk.CTkFrame):
 
                         self.controller.start_network_monitor_service()
                         
-                        # Save login mode
-                        result['user']['login_mode'] = self.login_mode_var.get()
+                        # Save selected user role (override server role if needed)
+                        selected_role_thai = self.user_role_var.get()
+                        selected_role = self.role_mapping.get(selected_role_thai, "patient")
+                        result['user']['urole'] = selected_role
+                        result['user']['login_mode'] = selected_role  # Keep for backward compatibility
                         
                         with open('user_data.json', 'w', encoding='utf-8') as f:
                             json.dump(result['user'], f, ensure_ascii=False, indent=4, default=default_serializer)
@@ -541,7 +728,7 @@ class login(ctk.CTkFrame):
             corner_radius=8,             
             command=save_and_go_home         
         )         
-        save_button.grid(row=6, column=0, columnspan=2, padx=30, pady=(0, 40), sticky="ew")
+        save_button.grid(row=7, column=0, columnspan=2, padx=30, pady=(0, 40), sticky="ew")
         
         # === การตั้งค่า Grid Layout ===
         frame.grid_columnconfigure(0, weight=1)
@@ -582,7 +769,21 @@ class HomePage(ctk.CTkFrame):
         self.check_network_and_update_buttons()
         
         # รีเซ็ตปุ่ม SOS เมื่อกลับมาที่หน้า HomePage เพื่อให้สามารถกดได้อีกครั้ง
-        self.reset_sos_button()
+        # และควบคุมการแสดงปุ่ม SOS ตาม role
+        user_role = None
+        if hasattr(self.controller, 'user') and self.controller.user:
+            user_role = self.controller.user.get('urole', '').lower()
+        
+        # แสดงปุ่ม SOS สำหรับทุก role (Patient, User, และ Admin)
+        if hasattr(self, 'call_button') and self.call_button:
+            # แสดงปุ่ม SOS สำหรับทุก role
+            # ตรวจสอบว่าปุ่มยังไม่ได้ถูก place อยู่แล้ว
+            try:
+                self.call_button.place_info()
+            except:
+                # ถ้ายังไม่ได้ place ให้ place
+                self.call_button.place(x=550, y=35)
+                self.reset_sos_button()
        
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -610,7 +811,7 @@ class HomePage(ctk.CTkFrame):
 
         self.time_label = ctk.CTkLabel(self, text="", font=("TH Sarabun New", 40, "bold"),
                                        fg_color="#8acaef", text_color="white")
-        self.time_label.place(x=365, y=185)
+        self.time_label.place(x=365, y=182)
 
         # สร้างส่วนแสดงข้อมูลการตั้งค่ายา
         self.create_medication_display()
@@ -683,10 +884,10 @@ class HomePage(ctk.CTkFrame):
         self.call_photo = self.call_photo_online
         
         # สีสำหรับปุ่ม SOS - ตกแต่งให้สวยงามขึ้น
-        sos_fg_color = "#8acaef"  # สีแดงสดใสสำหรับปุ่ม SOS
-        sos_hover_color = "#8acaef"  # สีแดงเข้มขึ้นเมื่อ hover
-        sos_bg_color = "#8acaef"
-        sos_border_color = "#8acaef"  # สีขอบแดงอ่อน
+        sos_fg_color = "#EF5350"  # สีแดงสดใสสำหรับปุ่ม SOS
+        sos_hover_color = "#EF5350"  # สีแดงเข้มขึ้นเมื่อ hover
+        sos_bg_color = "#EF5350"
+        sos_border_color = "#EF5350"  # สีขอบแดงอ่อน
         
         self.call_button = ctk.CTkButton(
             self, 
@@ -702,7 +903,8 @@ class HomePage(ctk.CTkFrame):
             height=200,
             command=self.on_video_call_click
         )
-        self.call_button.place(x=550, y=35)
+        # อย่า place ทันที - รอให้ on_show() ตรวจสอบ role ก่อน
+        # self.call_button.place(x=550, y=35)  # ย้ายไปที่ on_show()
         
         # บันทึกสไตล์เดิมของปุ่ม SOS
         self.call_button_original_style = {
@@ -835,47 +1037,138 @@ class HomePage(ctk.CTkFrame):
         self.menu_buttons = {}
         self.button_original_styles = {}
         
-        # Check Login Mode
-        is_user_mode = False
+        # Get user role (urole field from user data)
+        user_role = None
         if hasattr(self.controller, 'user') and self.controller.user:
-             is_user_mode = self.controller.user.get('login_mode') == 'user'
-
-        if is_user_mode:
-            # User Mode: Create a large logout button at the bottom
+            user_role = self.controller.user.get('urole', '').lower()
+        
+        # Get theme for current role
+        theme = get_role_theme(user_role)
+        
+        # Level 3: Patient (ผู้ป่วย) - Show only SOS button (already visible) and Logout
+        if user_role == 'patient':
             try:
                 logout_icon_path = f"{PATH}imgNew/iconout.png"
                 logout_img = Image.open(logout_icon_path).resize((100, 100), Image.Resampling.LANCZOS)
                 logout_photo = ImageTk.PhotoImage(logout_img)
                 
-                # Calculate center position
-                x_pos = (1024 - 150) // 2  # Center horizontally
-                y_pos = 620  # Bottom position
-                
+                # Place logout button at bottom right
                 logout_btn = ctk.CTkButton(
                     self,
                     image=logout_photo,
-                    text="ออกจากระบบ",
+                    text="ออกระบบ",
                     compound="top",
-                    font=("TH Sarabun New", 28, "bold"),
-                    fg_color="#D32F2F",
+                    font=("TH Sarabun New", 24, "bold"),  # เพิ่มขนาดฟอนต์
+                    fg_color="white",
                     bg_color="#8acaef",
-                    hover_color="#B71C1C",
-                    text_color="white",
-                    border_width=3,
+                    hover_color="#FFCDC9",
+                    text_color="black",
+                    border_width=5,
                     border_color="#FFCDD2",
-                    width=150,
-                    height=100,
-                    corner_radius=15,
+                    width=100,
+                    height=220,
+                    corner_radius=0,
                     command=self.confirm_logout
                 )
-                logout_btn.place(x=800, y=100)
+                logout_btn.place(x=880, y=570)  # ปรับตำแหน่งให้เหมาะสมกับหน้าจอ 1024x600
                 logout_btn.image = logout_photo  # Keep reference
                 self.menu_buttons['logout'] = logout_btn
+                
+                # Ensure SOS button is visible for patients
+                if hasattr(self, 'call_button') and self.call_button:
+                    self.call_button.place(x=550, y=35)
             except Exception as e:
-                print(f"Error creating user logout button: {e}")
+                print(f"Error creating patient logout button: {e}")
+            return
+        
+        # Level 2: User (ผู้ใช้งาน) - Show only: ตั้งเวลา, สุขภาพ, รายงาน, ออกระบบ
+        if user_role == 'user':
+            btn_size = (100, 100)
+            btn_images = {}
+            
+            # Show: ตั้งเวลา (Frame3), สุขภาพ (Frame4), รายงาน (ReportFrame), ออกระบบ (login), ปิดเครื่อง
+            paths = [
+                f"{PATH}imgNew/icontime.png",
+                f"{PATH}imgNew/iconheath.png",
+                f"{PATH}imgNew/iconreport.png",
+                f"{PATH}imgNew/iconout.png",
+                f"{PATH}imgNew/icondow.png"
+            ]
+            btn_texts = [
+                "ตั้งเวลา",
+                "สุขภาพ",
+                "รายงาน",
+                "ออกระบบ",
+                "ปิดเครื่อง"
+            ]
+            pages = [Frame3, Frame4, ReportFrame, login, None]  # None สำหรับปุ่มปิดเครื่อง  
+            
+            for i, path in enumerate(paths, start=1):
+                try:
+                    img = Image.open(path).resize(btn_size, Image.Resampling.LANCZOS)
+                    btn_images[i] = ImageTk.PhotoImage(img)
+                except FileNotFoundError:
+                    print(f"Error: {path} not found.")
+            
+            # แสดงปุ่ม SOS สำหรับ User
+            if hasattr(self, 'call_button') and self.call_button:
+                self.call_button.place(x=550, y=35)
+            
+            # จัดปุ่มเป็น 1 แถว - ใช้ค่าจาก theme layout
+            menu_layout = theme.get('layout', {}).get('menu_buttons', {})
+            btn_width = menu_layout.get('btn_width', 100)
+            btn_height = menu_layout.get('btn_height', 90)
+            start_x = menu_layout.get('start_x', 30)
+            start_y = menu_layout.get('start_y', 600)
+            spacing = menu_layout.get('spacing', 40)
+            
+            for i in range(len(paths)):
+                if i + 1 in btn_images:
+                    text = btn_texts[i]
+                    x_pos = start_x + i * (btn_width + spacing)
+                    y_pos = start_y
+                    
+                    # คำสั่งของแต่ละปุ่ม
+                    if i == 3:  # Logout button (index 3 = ออกระบบ)
+                        command = self.confirm_logout
+                    elif i == 4:  # Shutdown button (index 4 = ปิดเครื่อง)
+                        command = self.shutdown_system
+                    else:
+                        command = lambda i=i: controller.show_frame(pages[i])
+                    
+                    # ใช้ theme ตาม role
+                    btn_style = theme['button']
+                    style = {
+                        'fg_color': btn_style['fg_color'],
+                        'hover_color': btn_style['hover_color'],
+                        'text_color': btn_style['text_color'],
+                        'border_color': btn_style['border_color']
+                    }
+                    
+                    # สร้างปุ่ม
+                    btn = ctk.CTkButton(
+                        self,
+                        image=btn_images[i + 1],
+                        text=text,
+                        compound="top",
+                        font=("TH Sarabun New", 22, "bold"),
+                        fg_color=btn_style['fg_color'],
+                        bg_color="#000001",   
+                        hover_color=btn_style['hover_color'],
+                        text_color=btn_style['text_color'],
+                        border_width=btn_style['border_width'],
+                        border_color=btn_style['border_color'],
+                        width=100,
+                        height=90,
+                        corner_radius=btn_style['corner_radius'],
+                        command=command
+                    )
+                    btn.place(x=x_pos, y=y_pos)
+                    self.menu_buttons[i] = btn
+                    self.button_original_styles[i] = style
             return
 
-        # Caregiver Mode: Show full menu
+        # Level 1: Admin (ผู้ดูแลระบบ) - Show full menu (all buttons)
         btn_size = (100, 100)
         btn_images = {}
         pressure = 0
@@ -911,12 +1204,13 @@ class HomePage(ctk.CTkFrame):
             except FileNotFoundError:
                 print(f"Error: {path} not found.")
 
-        # จัดปุ่มเป็น 2 แถว
+        # จัดปุ่มเป็น 2 แถว - ใช้ค่าจาก theme layout
         buttons_per_row = 7
-        btn_width = 100
-        btn_height = 80
-        start_x = 30
-        start_y = 600
+        menu_layout = theme.get('layout', {}).get('menu_buttons', {})
+        btn_width = menu_layout.get('btn_width', 100)
+        btn_height = menu_layout.get('btn_height', 90)
+        start_x = menu_layout.get('start_x', 30)
+        start_y = menu_layout.get('start_y', 600)
 
         for i in range(7):
             if i + 1 in btn_images:
@@ -938,29 +1232,34 @@ class HomePage(ctk.CTkFrame):
                 else:
                     command = lambda i=i: controller.show_frame(pages[i])
                 
+                # ใช้ theme ตาม role
+                btn_style = theme['button']
                 style = {
-                    'fg_color': "#FFFFFF",
-                    'hover_color': "#E9ECEF",
-                    'text_color': "#1D3557",
-                    'border_color': "#A8DADC"
+                    'fg_color': btn_style['fg_color'],
+                    'hover_color': btn_style['hover_color'],
+                    'text_color': btn_style['text_color'],
+                    'border_color': btn_style['border_color']
                 }
 
-                # สร้างปุ่ม
+                # สร้างปุ่ม - เพิ่มขนาดฟอนต์สำหรับ admin mode
+                is_admin_mode = (user_role == 'admin')
+                btn_font_size = 26 if is_admin_mode else 22
+                
                 btn = ctk.CTkButton(
                     self,
                     image=btn_images[i + 1],
                     text=text,
                     compound="top",
-                    font=("TH Sarabun New", 22, "bold"),
-                    fg_color="#FFFFFF",
+                    font=("TH Sarabun New", btn_font_size, "bold"),
+                    fg_color=btn_style['fg_color'],
                     bg_color="#000001",   
-                    hover_color="#E9ECEF",
-                    text_color="#1D3557",
-                    border_width=2,
-                    border_color="#A8DADC",
+                    hover_color=btn_style['hover_color'],
+                    text_color=btn_style['text_color'],
+                    border_width=btn_style['border_width'],
+                    border_color=btn_style['border_color'],
                     width=100,
                     height=90,
-                    corner_radius=0,
+                    corner_radius=btn_style['corner_radius'],
                     command=command
                 )
                 btn.place(x=x_pos, y=y_pos)
@@ -990,60 +1289,84 @@ class HomePage(ctk.CTkFrame):
                 os.system("sudo shutdown -h now")
 
     def create_medication_display(self):
+        # Always destroy existing frame first
         if hasattr(self, 'medication_frame') and self.medication_frame:
             self.medication_frame.destroy()
+            self.medication_frame = None
 
-        # Check Mode
-        is_user_mode = False
+        # Check User Role
+        user_role = None
         if hasattr(self.controller, 'user') and self.controller.user:
-             is_user_mode = self.controller.user.get('login_mode') == 'user'
+            user_role = self.controller.user.get('urole', '').lower()
         
-        height_box = 500 if is_user_mode else 300
-        list_height = 400 if is_user_mode else 150
+        # Show for all roles: Patient, User, and Admin
+        is_patient_mode = (user_role == 'patient')
+        height_box = 280 if is_patient_mode else 300
+        # list_height = 400 if is_patient_mode else 150
+
+        # ใช้ theme ตาม role
+        theme = get_role_theme(user_role)
+        frame_style = theme['frame']
+        info_style = theme['info_box']
+        layout = theme.get('layout', {})
+        
+        # ดึงค่าตำแหน่งและขนาดจาก theme layout
+        med_layout = layout.get('medication_frame', {})
+        med_x = med_layout.get('x', 340)
+        med_y = med_layout.get('y', 280)
+        med_width = med_layout.get('width', 340)
+        med_height = med_layout.get('height', height_box)
 
         # ปรับปรุงการแสดงข้อมูลยาให้สวยงาม
         self.medication_frame = ctk.CTkFrame(
             self,
-            width=340,
-            height=height_box,
+            width=med_width,
+            height=med_height,
             corner_radius=0,
-            fg_color="#FFFFFF",
-            bg_color="#000001",
-            border_width=2,
-            border_color="#E8F4FD"
+            fg_color=frame_style['fg_color'],
+            bg_color=frame_style['bg_color'],
+            border_width=frame_style['border_width'],
+            border_color=frame_style['border_color']
         )
-        self.medication_frame.place(x=340, y=280)
+        self.medication_frame.place(x=med_x, y=med_y)
         #pywinstyles.set_opacity(self.medication_frame, value=1, color="#000001")
 
-        # หัวข้อพร้อมไอคอน
+        # หัวข้อพร้อมไอคอน - ปรับขนาดตาม role
+        is_user_mode = (user_role == 'user')
+        is_admin_mode = (user_role == 'admin')
+        header_width = (med_width - 20) if is_patient_mode else 320
+        header_font_size = 32 if is_patient_mode else (28 if is_user_mode else (27 if is_admin_mode else 25))
+        title_font_size = 32 if is_patient_mode else (28 if is_user_mode else (27 if is_admin_mode else 25))
+        
         header_frame = ctk.CTkFrame(
             self.medication_frame,
-            width=320,
-            height=40,
+            width=header_width,
+            height=50 if is_patient_mode else 45,
             corner_radius=20,
-            fg_color="#E8F4FD"
+            fg_color=info_style['header_color']
         )
         header_frame.place(x=10, y=10)
 
         medication_icon = ctk.CTkLabel(
             header_frame,
             text=" ",
-            font=("TH Sarabun New", 24),
+            font=("TH Sarabun New", 28 if is_patient_mode else (26 if is_user_mode else (25 if is_admin_mode else 24))),
             fg_color="transparent"
         )
-        medication_icon.place(x=10, y=8)
+        medication_icon.place(x=10, y=10 if is_patient_mode else 8)
 
         self.medication_title = ctk.CTkLabel(
             header_frame,
             text="การตั้งค่ายา",
-            font=("TH Sarabun New", 25, "bold"),
+            font=("TH Sarabun New", title_font_size, "bold"),
             text_color="#000000",
             fg_color="transparent"
         )
-        self.medication_title.place(x=30, y=10)
+        self.medication_title.place(x=30, y=12 if is_patient_mode else 10)
 
-        if not is_user_mode:
-            # ปุ่มควบคุม (แสดงเฉพาะ Caregiver)
+        # ปุ่มควบคุม (แสดงเฉพาะ Admin เท่านั้น)
+        is_admin_mode = (user_role == 'admin')
+        if is_admin_mode:
             self.refresh_button = ctk.CTkButton(
                 header_frame,
                 text="รีเซ็ต",
@@ -1088,110 +1411,168 @@ class HomePage(ctk.CTkFrame):
                 'state': 'normal'
             }
 
+        # คำนวณความสูงของ list frame จากความสูงของ frame หลัก
+        list_height = med_height - (75 if is_patient_mode else 110)
+        # สำหรับ patient mode: ลด width เล็กน้อยเพื่อให้ scrollbar แสดงชัดเจน
+        list_width = (med_width - 30) if is_patient_mode else 310
+        
         # สร้างกรอบสำหรับแสดงรายการยา
+        # สำหรับ patient mode: ตั้งค่า scrollbar ให้เห็นชัดเจน
+        scrollbar_params = {}
+        if is_patient_mode:
+            scrollbar_params = {
+                'scrollbar_button_color': '#8acaef',
+                'scrollbar_button_hover_color': '#6BA8D1',
+                'scrollbar_fg_color': '#E8F4FD'
+            }
+        
         self.medication_list_frame = ctk.CTkScrollableFrame(
             self.medication_frame,
-            width=310,
+            width=list_width,
             height=list_height,
             fg_color="#F8F9FA",
             corner_radius=10,
             border_width=1,
-            border_color="#DEE2E6"
+            border_color="#DEE2E6",
+            **scrollbar_params
         )
-        self.medication_list_frame.place(x=10, y=60)
+        self.medication_list_frame.place(x=10, y=(70 if is_patient_mode else 65))
 
         self.medication_labels = []
 
     def create_user_info_display(self):
+        # Always destroy existing frame first
         if hasattr(self, 'user_info_frame') and self.user_info_frame:
             self.user_info_frame.destroy()
+            self.user_info_frame = None
 
-        # Check Mode
-        is_user_mode = False
+        # Check User Role
+        user_role = None
         if hasattr(self.controller, 'user') and self.controller.user:
-             is_user_mode = self.controller.user.get('login_mode') == 'user'
+            user_role = self.controller.user.get('urole', '').lower()
         
-        height_box = 500 if is_user_mode else 300
-        content_height = 430 if is_user_mode else 230
+        # Show for all roles: Patient, User, and Admin
+        is_patient_mode = (user_role == 'patient')
+        height_box = 280 if is_patient_mode else 300
+        # content_height = 430 if is_patient_mode else 230
+
+        # ใช้ theme ตาม role
+        theme = get_role_theme(user_role)
+        frame_style = theme['frame']
+        info_style = theme['info_box']
+        layout = theme.get('layout', {})
+        
+        # ดึงค่าตำแหน่งและขนาดจาก theme layout
+        user_layout = layout.get('user_info_frame', {})
+        user_x = user_layout.get('x', 700)
+        user_y = user_layout.get('y', 280)
+        user_width = user_layout.get('width', 300)
+        user_height = user_layout.get('height', height_box)
 
         # ปรับปรุงการแสดงข้อมูลผู้ใช้ให้สวยงาม
         self.user_info_frame = ctk.CTkFrame(
             self,
-            width=300,
-            height=height_box,
+            width=user_width,
+            height=user_height,
             corner_radius=0,
-            fg_color="#FFFFFF",
-            bg_color="#000001",
-            border_width=2,
-            border_color="#FFF2E8"
+            fg_color=frame_style['fg_color'],
+            bg_color=frame_style['bg_color'],
+            border_width=frame_style['border_width'],
+            border_color=frame_style['border_color']
         )
-        self.user_info_frame.place(x=700, y=280)
+        self.user_info_frame.place(x=user_x, y=user_y)
         #pywinstyles.set_opacity(self.user_info_frame, value=1, color="#000001")
 
-        # หัวข้อพร้อมไอคอน
+        # หัวข้อพร้อมไอคอน - ปรับขนาดตาม role
+        is_user_mode = (user_role == 'user')
+        is_admin_mode = (user_role == 'admin')
+        header_width = (user_width - 20) if is_patient_mode else 280
+        title_font_size = 32 if is_patient_mode else (28 if is_user_mode else (27 if is_admin_mode else 25))
+        
         header_frame = ctk.CTkFrame(
             self.user_info_frame,
-            width=280,
-            height=40,
+            width=header_width,
+            height=50 if is_patient_mode else 45,
             corner_radius=10,
-            fg_color="#FFF2E8"
+            fg_color=info_style['header_color']
         )
         header_frame.place(x=10, y=10)
 
         user_icon = ctk.CTkLabel(
             header_frame,
             text=" ",
-            font=("TH Sarabun New", 24),
+            font=("TH Sarabun New", 28 if is_patient_mode else (26 if is_user_mode else (25 if is_admin_mode else 24))),
             fg_color="transparent"
         )
-        user_icon.place(x=10, y=8)
+        user_icon.place(x=10, y=10 if is_patient_mode else 8)
 
         self.user_info_title = ctk.CTkLabel(
             header_frame,
             text="ข้อมูลผู้ใช้",
-            font=("TH Sarabun New", 25, "bold"),
+            font=("TH Sarabun New", title_font_size, "bold"),
             text_color="#000000",
             fg_color="transparent"
         )
-        self.user_info_title.place(x=50, y=10)
+        self.user_info_title.place(x=50, y=12 if is_patient_mode else 10)
+
+        # คำนวณความสูงของ content จากความสูงของ frame หลัก
+        content_height = user_height - (75 if is_patient_mode else 80)
+        content_width = (user_width - 20) if is_patient_mode else 280
 
         # สร้างกรอบสำหรับแสดงข้อมูล
         self.user_info_content = ctk.CTkScrollableFrame(
             self.user_info_frame,
-            width=280,
+            width=content_width,
             height=content_height,
             fg_color="#F8F9FA",
             corner_radius=10,
             border_width=1,
             border_color="#DEE2E6"
         )
-        self.user_info_content.place(x=10, y=60)
+        self.user_info_content.place(x=10, y=65)
 
         self.user_info_labels = []
 
     def create_counter_medicine_display(self):
+        # Always destroy existing frame first
         if hasattr(self, 'medicine_frame') and self.medicine_frame:
             self.medicine_frame.destroy()
+            self.medicine_frame = None
 
-        # Check Mode
-        is_user_mode = False
+        # Check User Role
+        user_role = None
         if hasattr(self.controller, 'user') and self.controller.user:
-             is_user_mode = self.controller.user.get('login_mode') == 'user'
+            user_role = self.controller.user.get('urole', '').lower()
         
-        height_box = 500 if is_user_mode else 300
-        font_size = 120 if is_user_mode else 80
+        # Show for all roles: Patient, User, and Admin
+        is_patient_mode = (user_role == 'patient')
+        height_box = 280 if is_patient_mode else 300
+        # font_size จะถูกกำหนดใหม่ในส่วนที่สร้าง label
+
+        # ใช้ theme ตาม role
+        theme = get_role_theme(user_role)
+        frame_style = theme['frame']
+        info_style = theme['info_box']
+        layout = theme.get('layout', {})
+        
+        # ดึงค่าตำแหน่งและขนาดจาก theme layout
+        medicine_layout = layout.get('medicine_frame', {})
+        medicine_x = medicine_layout.get('x', 20)
+        medicine_y = medicine_layout.get('y', 280)
+        medicine_width = medicine_layout.get('width', 300)
+        medicine_height = medicine_layout.get('height', height_box)
 
         self.medicine_frame = ctk.CTkFrame(
             self,
-            width=300,
-            height=height_box,
+            width=medicine_width,
+            height=medicine_height,
             corner_radius=0,
-            fg_color="#FFFFFF",
-            bg_color="#000001",
-            border_width=2,
-            border_color="#FFF2E8"
+            fg_color=frame_style['fg_color'],
+            bg_color=frame_style['bg_color'],
+            border_width=frame_style['border_width'],
+            border_color=frame_style['border_color']
         )
-        self.medicine_frame.place(x=20, y=280)
+        self.medicine_frame.place(x=medicine_x, y=medicine_y)
         #pywinstyles.set_opacity(self.medicine_frame, value=1, color="#000001")
         
         # Destroy previous test mode section if it exists
@@ -1207,17 +1588,24 @@ class HomePage(ctk.CTkFrame):
         self.test_mode_slider = None
         self.test_mode_value_label = None
     
-        # หัวข้อพร้อมไอคอน
+        # หัวข้อพร้อมไอคอน - ปรับขนาดตาม role
+        is_user_mode = (user_role == 'user')
+        is_admin_mode = (user_role == 'admin')
+        header_width = (medicine_width - 20) if is_patient_mode else 280
+        title_font_size = 32 if is_patient_mode else (28 if is_user_mode else (27 if is_admin_mode else 25))
+        
         header_frame = ctk.CTkFrame(
             self.medicine_frame,
-            width=280,
-            height=40,
+            width=header_width,
+            height=50 if is_patient_mode else 45,
             corner_radius=10,
-            fg_color="#FFF2E8"
+            fg_color=info_style['header_color']
         )
         header_frame.place(x=10, y=10)
         
-        if not is_user_mode:
+        # ปุ่มรีเซ็ตจำนวนยา (แสดงเฉพาะ Admin เท่านั้น)
+        is_admin_mode = (user_role == 'admin')
+        if is_admin_mode:
             self.reset_counter_button = ctk.CTkButton(
                 header_frame,
                 text="รีเซ็ต",
@@ -1230,7 +1618,7 @@ class HomePage(ctk.CTkFrame):
                 height=25,
                 command=self.reset_medicine_count  # เอา lambda ออก
             )
-            self.reset_counter_button.place(x=200, y=8)
+            self.reset_counter_button.place(x=220, y=8)
             
             # บันทึกสไตล์เดิมของปุ่มรีเซ็ตจำนวนยา
             self.reset_counter_button_original_style = {
@@ -1243,11 +1631,11 @@ class HomePage(ctk.CTkFrame):
         self.medicine_title = ctk.CTkLabel(
             header_frame,
             text="จำนวนยาคงเหลือ",
-            font=("TH Sarabun New", 25, "bold"),
+            font=("TH Sarabun New", title_font_size, "bold"),
             text_color="#000000",
             fg_color="transparent"
         )
-        self.medicine_title.place(x=10, y=10)
+        self.medicine_title.place(x=10, y=12 if is_patient_mode else 10)
 
         # เริ่มต้นค่าตัวแปรสำหรับเก็บจำนวนยา
         if hasattr(self.controller, 'user') and self.controller.user and 'count_medicine' in self.controller.user:
@@ -1256,22 +1644,39 @@ class HomePage(ctk.CTkFrame):
             self.medicine_count = 28
         
         # สร้าง Label สำหรับแสดงจำนวนยา
+        # ปรับขนาดและตำแหน่งสำหรับผู้ป่วย
+        is_user_mode = (user_role == 'user')
+        is_admin_mode = (user_role == 'admin')
+        if is_patient_mode:
+            counter_width = medicine_width - 40  # ใช้ความกว้างเต็มของ frame ลบ padding
+            counter_height = medicine_height - 80  # ใช้ความสูงเต็มของ frame ลบ header
+            counter_x = 20
+            counter_y = 70
+            font_size = 140  # เพิ่มขนาดฟอนต์ให้ใหญ่ขึ้น
+        else:
+            counter_width = 250
+            counter_height = 150
+            counter_x = 25
+            counter_y = 60
+            font_size = 95 if is_user_mode else (90 if is_admin_mode else 80)  # เพิ่มขนาดฟอนต์สำหรับ user และ admin mode
+            
         self.counter_medicine = ctk.CTkLabel(
             self.medicine_frame,
             text=str(self.medicine_count),
-            width=250,
-            height=150,
+            width=counter_width,
+            height=counter_height,
             fg_color="#F8F9FA",
             corner_radius=10,
             font=("TH Sarabun New", font_size, "bold"),
             text_color="#2E7D32"
         )
-        self.counter_medicine.place(x=25, y=60)
+        self.counter_medicine.place(x=counter_x, y=counter_y)
         
         print(f"Medicine counter display created: {self.medicine_count} pills")
         
-        # แสดง Test Mode สำหรับผู้ดูแล (Caregiver)
-        if not is_user_mode:
+        # แสดง Test Mode สำหรับผู้ดูแล (Admin only)
+        is_admin_mode = (user_role == 'admin')
+        if is_admin_mode:
             self._build_test_mode_controls()
 
     def _build_test_mode_controls(self):
@@ -1394,6 +1799,10 @@ class HomePage(ctk.CTkFrame):
     # ฟังก์ชันสำหรับอัพเดทจำนวนยา
     def update_medicine_count(self, new_count=None):
         """อัพเดทจำนวนยาคงเหลือ"""
+        # ตรวจสอบว่ามี counter_medicine widget หรือไม่ (อาจไม่มีถ้า role เป็น user)
+        if not hasattr(self, 'counter_medicine') or self.counter_medicine is None:
+            return  # ไม่ต้องอัพเดทถ้าไม่มี widget
+        
         if new_count is not None:
             self.medicine_count = new_count
             # อัพเดทค่าใน controller.user ด้วย
@@ -1485,6 +1894,10 @@ class HomePage(ctk.CTkFrame):
 
     def update_user_info(self):
         try:
+            # ตรวจสอบว่ามี user_info_content หรือไม่ (อาจไม่มีถ้า role เป็น user)
+            if not hasattr(self, 'user_info_content') or self.user_info_content is None:
+                return  # ไม่ต้องอัพเดทถ้าไม่มี widget
+            
             # ป้องกันการอัพเดทซ้ำถ้ากำลังโหลดอยู่
             if hasattr(self, '_updating_user_info') and self._updating_user_info:
                 return
@@ -1493,62 +1906,196 @@ class HomePage(ctk.CTkFrame):
             print("กำลังอัพเดทข้อมูลผู้ใช้...")
             
             # ลบข้อมูลเก่า
-            for label in self.user_info_labels:
-                try:
-                    label.destroy()
-                except:
-                    pass
-            self.user_info_labels.clear()
+            if hasattr(self, 'user_info_labels'):
+                for label in self.user_info_labels:
+                    try:
+                        label.destroy()
+                    except:
+                        pass
+                self.user_info_labels.clear()
+            else:
+                self.user_info_labels = []
 
             # แสดงข้อมูลผู้ใช้
             if hasattr(self.controller, 'user') and self.controller.user:
                 user = self.controller.user
                 print(f"พบข้อมูลผู้ใช้: {user.get('firstname_th', '')} {user.get('lastname_th', '')}")
                 
+                # ตรวจสอบ role เพื่อปรับขนาด
+                user_role = None
+                if hasattr(self.controller, 'user') and self.controller.user:
+                    user_role = self.controller.user.get('urole', '').lower()
+                is_patient_mode = (user_role == 'patient')
+                is_user_mode = (user_role == 'user')
+                is_admin_mode = (user_role == 'admin')
+                
                 # ข้อมูลพื้นฐาน
-                user_info = []
-                user_info.append(f"ผู้ป่วย: {user.get('firstname_th', '')} {user.get('lastname_th', '')}")
-                user_info.append(f"โทรศัพท์: {user.get('phone', '')}")
-                
-                if user.get('chronic_disease'):
-                    user_info.append(f"โรค: {user.get('chronic_disease', '')}")
-                
-                if user.get('caretaker_name'):
-                    user_info.append(f"ผู้ดูแล: {user.get('caretaker_name', '')}")
+                patient_name = f"ผู้ป่วย: {user.get('firstname_th', '')} {user.get('lastname_th', '')}"
+                phone = f"โทรศัพท์: {user.get('phone', '')}"
+                disease = f"โรค: {user.get('chronic_disease', '')}" if user.get('chronic_disease') else None
+                caretaker = f"ผู้ดูแล: {user.get('caretaker_name', '')}" if user.get('caretaker_name') else None
 
-                # แสดงข้อมูลในรูปแบบการ์ด
-                for i, info in enumerate(user_info):
-                    info_card = ctk.CTkFrame(
+                # ปรับขนาดตาม role
+                card_height = 50 if is_patient_mode else (42 if is_user_mode else (40 if is_admin_mode else 35))
+                info_font_size = 26 if is_patient_mode else (22 if is_user_mode else (20 if is_admin_mode else 16))
+                card_pady = 5 if is_patient_mode else (4 if is_user_mode else (3.5 if is_admin_mode else 3))
+
+                # สำหรับ patient mode: แสดงเป็น 2 คอลัมน์
+                if is_patient_mode:
+                    # สร้าง container สำหรับ 2 คอลัมน์
+                    row_frame = ctk.CTkFrame(
                         self.user_info_content,
-                        height=35,
-                        corner_radius=8,
-                        fg_color="#E8F4FD" if i % 2 == 0 else "#FFF2E8"
+                        fg_color="transparent"
                     )
-                    info_card.pack(pady=3, padx=5, fill="x")
+                    row_frame.pack(pady=card_pady, padx=5, fill="x")
                     
-                    info_label = ctk.CTkLabel(
-                        info_card,
-                        text=info,
-                        font=("TH Sarabun New", 16, "bold"),
+                    # คอลัมน์แรก (ครึ่งซ้าย): ผู้ป่วย, โทรศัพท์
+                    left_column = ctk.CTkFrame(
+                        row_frame,
+                        fg_color="transparent"
+                    )
+                    left_column.pack(side="left", fill="both", expand=True, padx=(0, 5))
+                    
+                    # ผู้ป่วย
+                    patient_card = ctk.CTkFrame(
+                        left_column,
+                        height=card_height,
+                        corner_radius=8,
+                        fg_color="#E8F4FD"
+                    )
+                    patient_card.pack(pady=(0, card_pady), padx=0, fill="x")
+                    patient_label = ctk.CTkLabel(
+                        patient_card,
+                        text=patient_name,
+                        font=("TH Sarabun New", info_font_size, "bold"),
                         text_color="#000000",
                         fg_color="transparent",
                         justify="left",
                         anchor="w"
                     )
-                    info_label.pack(pady=5, padx=10, fill="x",anchor="w")
+                    patient_label.pack(pady=10, padx=15, fill="x", anchor="w")
+                    self.user_info_labels.extend([patient_card, patient_label])
                     
-                    self.user_info_labels.append(info_card)
-                    self.user_info_labels.append(info_label)
+                    # โทรศัพท์
+                    phone_card = ctk.CTkFrame(
+                        left_column,
+                        height=card_height,
+                        corner_radius=8,
+                        fg_color="#FFF2E8"
+                    )
+                    phone_card.pack(pady=0, padx=0, fill="x")
+                    phone_label = ctk.CTkLabel(
+                        phone_card,
+                        text=phone,
+                        font=("TH Sarabun New", info_font_size, "bold"),
+                        text_color="#000000",
+                        fg_color="transparent",
+                        justify="left",
+                        anchor="w"
+                    )
+                    phone_label.pack(pady=10, padx=15, fill="x", anchor="w")
+                    self.user_info_labels.extend([phone_card, phone_label, row_frame, left_column])
+                    
+                    # คอลัมน์ที่สอง (ครึ่งขวา): โรค, ผู้ดูแล
+                    right_column = ctk.CTkFrame(
+                        row_frame,
+                        fg_color="transparent"
+                    )
+                    right_column.pack(side="right", fill="both", expand=True, padx=(5, 0))
+                    
+                    # โรค
+                    if disease:
+                        disease_card = ctk.CTkFrame(
+                            right_column,
+                            height=card_height,
+                            corner_radius=8,
+                            fg_color="#E8F4FD"
+                        )
+                        disease_card.pack(pady=(0, card_pady), padx=0, fill="x")
+                        disease_label = ctk.CTkLabel(
+                            disease_card,
+                            text=disease,
+                            font=("TH Sarabun New", info_font_size, "bold"),
+                            text_color="#000000",
+                            fg_color="transparent",
+                            justify="left",
+                            anchor="w"
+                        )
+                        disease_label.pack(pady=10, padx=15, fill="x", anchor="w")
+                        self.user_info_labels.extend([disease_card, disease_label])
+                    
+                    # ผู้ดูแล
+                    if caretaker:
+                        caretaker_card = ctk.CTkFrame(
+                            right_column,
+                            height=card_height,
+                            corner_radius=8,
+                            fg_color="#FFF2E8"
+                        )
+                        caretaker_card.pack(pady=0, padx=0, fill="x")
+                        caretaker_label = ctk.CTkLabel(
+                            caretaker_card,
+                            text=caretaker,
+                            font=("TH Sarabun New", info_font_size, "bold"),
+                            text_color="#000000",
+                            fg_color="transparent",
+                            justify="left",
+                            anchor="w"
+                        )
+                        caretaker_label.pack(pady=10, padx=15, fill="x", anchor="w")
+                        self.user_info_labels.extend([caretaker_card, caretaker_label, right_column])
+                else:
+                    # สำหรับ non-patient mode: แสดงแบบเดิม (เรียงต่อกัน)
+                    user_info = []
+                    user_info.append(patient_name)
+                    user_info.append(phone)
+                    if disease:
+                        user_info.append(disease)
+                    if caretaker:
+                        user_info.append(caretaker)
+                    
+                    for i, info in enumerate(user_info):
+                        info_card = ctk.CTkFrame(
+                            self.user_info_content,
+                            height=card_height,
+                            corner_radius=8,
+                            fg_color="#E8F4FD" if i % 2 == 0 else "#FFF2E8"
+                        )
+                        info_card.pack(pady=card_pady, padx=5, fill="x")
+                        
+                        info_label = ctk.CTkLabel(
+                            info_card,
+                            text=info,
+                            font=("TH Sarabun New", info_font_size, "bold"),
+                            text_color="#000000",
+                            fg_color="transparent",
+                            justify="left",
+                            anchor="w"
+                        )
+                        info_label.pack(pady=6, padx=10, fill="x", anchor="w")
+                        
+                        self.user_info_labels.append(info_card)
+                        self.user_info_labels.append(info_label)
                     
                 # อัพเดทจำนวนยาด้วย
                 self.update_medicine_count()
                     
             else:
                 print("ไม่พบข้อมูลผู้ใช้")
+                # ตรวจสอบ role เพื่อปรับขนาด
+                user_role = None
+                if hasattr(self.controller, 'user') and self.controller.user:
+                    user_role = self.controller.user.get('urole', '').lower()
+                is_patient_mode = (user_role == 'patient')
+                
+                # ปรับขนาดตาม role
+                card_height = 90 if is_patient_mode else 80
+                font_size = 22 if is_patient_mode else 18
+                
                 # แสดงข้อความเมื่อไม่มีข้อมูลผู้ใช้
                 no_user_card = ctk.CTkFrame(
                     self.user_info_content,
-                    height=80,
+                    height=card_height,
                     corner_radius=10,
                     fg_color="#FFF3CD",
                     border_width=1,
@@ -1559,7 +2106,7 @@ class HomePage(ctk.CTkFrame):
                 warning_label = ctk.CTkLabel(
                     no_user_card,
                     text="⚠️ ไม่พบข้อมูลผู้ใช้",
-                    font=("TH Sarabun New", 18, "bold"),
+                    font=("TH Sarabun New", font_size, "bold"),
                     text_color="#856404",
                     fg_color="transparent"
                 )
@@ -1592,20 +2139,32 @@ class HomePage(ctk.CTkFrame):
                     pass
             self.medication_labels.clear()
 
+            # ตรวจสอบ role เพื่อปรับขนาด
+            user_role = None
+            if hasattr(self.controller, 'user') and self.controller.user:
+                user_role = self.controller.user.get('urole', '').lower()
+            is_patient_mode = (user_role == 'patient')
+            is_user_mode = (user_role == 'user')
+            is_admin_mode = (user_role == 'admin')
+            
+            # ปรับขนาดตาม role
+            card_height = 100 if is_patient_mode else (90 if is_user_mode else (85 if is_admin_mode else 80))
+            font_size = 28 if is_patient_mode else (24 if is_user_mode else (23 if is_admin_mode else 18))
+            
             # แสดงการ์ด "กำลังโหลด"
             loading_card = ctk.CTkFrame(
                 self.medication_list_frame,
-                height=80, corner_radius=10, fg_color="#FFF3CD",
+                height=card_height, corner_radius=10, fg_color="#FFF3CD",
                 border_width=1, border_color="#FFE69C"
             )
             loading_card.pack(pady=30, padx=10, fill="x")
             
             loading_label = ctk.CTkLabel(
                 loading_card, text="🔄 กำลังโหลดข้อมูลการตั้งค่ายา...",
-                font=("TH Sarabun New", 18, "bold"), text_color="#856404",
+                font=("TH Sarabun New", font_size, "bold"), text_color="#856404",
                 fg_color="transparent"
             )
-            loading_label.pack(pady=20)
+            loading_label.pack(pady=(25 if is_patient_mode else 20))
             
             self.medication_labels.extend([loading_card, loading_label])
         except Exception as e:
@@ -1727,6 +2286,20 @@ class HomePage(ctk.CTkFrame):
             # --- (โค้ดส่วนที่เหลือคือโค้ด "วาด UI" เดิมของคุณทั้งหมด) ---
             
             # 3. แสดงข้อมูลวันที่เริ่มและสิ้นสุด
+            # ตรวจสอบ role เพื่อปรับขนาด
+            user_role = None
+            if hasattr(self.controller, 'user') and self.controller.user:
+                user_role = self.controller.user.get('urole', '').lower()
+            is_patient_mode = (user_role == 'patient')
+            is_user_mode = (user_role == 'user')
+            is_admin_mode = (user_role == 'admin')
+            
+            # ดึงค่าความกว้างของ medication_frame จาก layout
+            theme = get_role_theme(user_role)
+            layout = theme.get('layout', {})
+            med_layout = layout.get('medication_frame', {})
+            med_width = med_layout.get('width', 340)
+            
             if hasattr(self.controller, 'user') and self.controller.user:
                 start_date = self.controller.user.get('startDate', '')
                 end_date = self.controller.user.get('endDate', '')
@@ -1741,19 +2314,23 @@ class HomePage(ctk.CTkFrame):
                         
                         date_info = f"ระยะเวลา: {start_str} - {end_str}"
                         
+                        # ปรับขนาดตาม role
+                        date_card_height = 50 if is_patient_mode else (45 if is_user_mode else (43 if is_admin_mode else 40))
+                        date_font_size = 24 if is_patient_mode else (22 if is_user_mode else (21 if is_admin_mode else 18))
+                        
                         date_card = ctk.CTkFrame(
                             self.medication_list_frame,
-                            height=40, corner_radius=8, fg_color="#D4EDDA",
+                            height=date_card_height, corner_radius=8, fg_color="#D4EDDA",
                             border_width=1, border_color="#C3E6CB"
                         )
                         date_card.pack(pady=2, padx=5, fill="x")
                         
                         date_label = ctk.CTkLabel(
                             date_card, text=date_info,
-                            font=("TH Sarabun New", 18, "bold"), text_color="#155724",
+                            font=("TH Sarabun New", date_font_size, "bold"), text_color="#155724",
                             fg_color="transparent"
                         )
-                        date_label.place(x=10, y=6)
+                        date_label.place(x=15, y=12 if is_patient_mode else 8)
                         
                         self.medication_labels.extend([date_card, date_label])
                     except Exception as e_date:
@@ -1784,33 +2361,53 @@ class HomePage(ctk.CTkFrame):
                                 med_names.append(med_name_item)
                         
                         if med_count > 0:
+                            # ตรวจสอบ role เพื่อปรับขนาดการ์ดและฟอนต์
+                            user_role = None
+                            if hasattr(self.controller, 'user') and self.controller.user:
+                                user_role = self.controller.user.get('urole', '').lower()
+                            is_patient_mode = (user_role == 'patient')
+                            is_user_mode = (user_role == 'user')
+                            is_admin_mode = (user_role == 'admin')
+                            
+                            # ปรับขนาดการ์ดและฟอนต์ตาม role
+                            card_height = 85 if is_patient_mode else (70 if is_user_mode else (65 if is_admin_mode else 60))
+                            time_font_size = 28 if is_patient_mode else (24 if is_user_mode else (23 if is_admin_mode else 20))
+                            count_font_size = 26 if is_patient_mode else (22 if is_user_mode else (21 if is_admin_mode else 20))
+                            status_font_size = 26 if is_patient_mode else (22 if is_user_mode else (21 if is_admin_mode else 20))
+                            
                             # สร้างการ์ดยา
                             med_card = ctk.CTkFrame(
-                                self.medication_list_frame, height=60, corner_radius=10,
+                                self.medication_list_frame, height=card_height, corner_radius=10,
                                 fg_color="#E8F6EF", border_width=2, border_color="#7EBCA2"
                             )
-                            med_card.pack(pady=3, padx=5, fill="x")
+                            med_card.pack(pady=4, padx=5, fill="x")
                             
                             time_label = ctk.CTkLabel(
                                 med_card, text=f"{meal_name} - {time_str}",
-                                font=("TH Sarabun New", 20, "bold"), text_color="#2D6A4F",
+                                font=("TH Sarabun New", time_font_size, "bold"), text_color="#2D6A4F",
                                 fg_color="transparent"
                             )
-                            time_label.place(x=10, y=5)
+                            time_label.place(x=15, y=10 if is_patient_mode else 8)
                             
                             count_label = ctk.CTkLabel(
                                 med_card, text=f" {med_count} รายการ",
-                                font=("TH Sarabun New", 20), text_color="#495057",
+                                font=("TH Sarabun New", count_font_size), text_color="#495057",
                                 fg_color="transparent"
                             )
-                            count_label.place(x=10, y=28)
+                            count_label.place(x=15, y=42 if is_patient_mode else 35)
 
                             status_label = ctk.CTkLabel(
                                 med_card, text=" พร้อมใช้",
-                                font=("TH Sarabun New", 20, "bold"), text_color="#FF0000",
+                                font=("TH Sarabun New", status_font_size, "bold"), text_color="#FF0000",
                                 fg_color="transparent"
                             )
-                            status_label.place(x=200, y=28)
+                            # ปรับตำแหน่ง status label ให้เหมาะสมกับความกว้างของ frame
+                            if is_patient_mode:
+                                # สำหรับ patient mode ที่ frame กว้าง 600px (จาก layout)
+                                status_x = 600 - 150  # ใช้ความกว้างของ frame จาก layout
+                            else:
+                                status_x = 200
+                            status_label.place(x=status_x, y=42 if is_patient_mode else 35)
                             
                             self.medication_labels.extend([med_card, time_label, count_label, status_label])
                 else:
@@ -1850,13 +2447,13 @@ class HomePage(ctk.CTkFrame):
         # เปลี่ยนสีของเวลาตามช่วงเวลา
         hour = today.hour
         if 6 <= hour < 12:
-            time_color = "#E67E22"  # สีส้ม (เช้า)
+            time_color = "#DC0000"  # สีส้ม (เช้า)
         elif 12 <= hour < 18:
-            time_color = "#F39C12"  # สีเหลือง (บ่าย)
+            time_color = "#F4B342"  # สีเหลือง (บ่าย)
         elif 18 <= hour < 22:
-            time_color = "#8E44AD"  # สีม่วง (เย็น)
+            time_color = "#C47BE4"  # สีม่วง (เย็น)
         else:
-            time_color = "#2C3E50"  # สีเข้ม (กลางคืน)
+            time_color = "#301CA0"  # สีเข้ม (กลางคืน)
             
         self.time_label.configure(text_color=time_color)
         
@@ -1893,9 +2490,21 @@ class HomePage(ctk.CTkFrame):
 
     def show_no_medication_message(self):
         """แสดงข้อความเมื่อไม่มีข้อมูลยา"""
+        # ตรวจสอบ role เพื่อปรับขนาด
+        user_role = None
+        if hasattr(self.controller, 'user') and self.controller.user:
+            user_role = self.controller.user.get('urole', '').lower()
+        is_patient_mode = (user_role == 'patient')
+        is_user_mode = (user_role == 'user')
+        is_admin_mode = (user_role == 'admin')
+        
+        # ปรับขนาดตาม role
+        card_height = 100 if is_patient_mode else (90 if is_user_mode else (85 if is_admin_mode else 80))
+        font_size = 28 if is_patient_mode else (24 if is_user_mode else (23 if is_admin_mode else 18))
+        
         no_med_card = ctk.CTkFrame(
             self.medication_list_frame,
-            height=80,
+            height=card_height,
             corner_radius=10,
             fg_color="#FFF3CD",
             border_width=1,
@@ -1906,19 +2515,31 @@ class HomePage(ctk.CTkFrame):
         warning_label = ctk.CTkLabel(
             no_med_card,
             text="⚠️ ไม่พบข้อมูลการตั้งค่ายา",
-            font=("TH Sarabun New", 18, "bold"),
+            font=("TH Sarabun New", font_size, "bold"),
             text_color="#856404",
             fg_color="transparent"
         )
-        warning_label.pack(pady=20)
+        warning_label.pack(pady=(25 if is_patient_mode else 20))
         
         self.medication_labels.extend([no_med_card, warning_label])
 
     def show_medication_error(self):
         """แสดงข้อความผิดพลาดเมื่อโหลดข้อมูลยาไม่สำเร็จ"""
+        # ตรวจสอบ role เพื่อปรับขนาด
+        user_role = None
+        if hasattr(self.controller, 'user') and self.controller.user:
+            user_role = self.controller.user.get('urole', '').lower()
+        is_patient_mode = (user_role == 'patient')
+        is_user_mode = (user_role == 'user')
+        is_admin_mode = (user_role == 'admin')
+        
+        # ปรับขนาดตาม role
+        card_height = 100 if is_patient_mode else (90 if is_user_mode else (85 if is_admin_mode else 80))
+        font_size = 28 if is_patient_mode else (24 if is_user_mode else (23 if is_admin_mode else 16))
+        
         error_card = ctk.CTkFrame(
             self.medication_list_frame,
-            height=80,
+            height=card_height,
             corner_radius=10,
             fg_color="#F8D7DA",
             border_width=1,
@@ -1929,11 +2550,11 @@ class HomePage(ctk.CTkFrame):
         error_label = ctk.CTkLabel(
             error_card,
             text="❌ เกิดข้อผิดพลาดในการโหลดข้อมูลยา",
-            font=("TH Sarabun New", 16, "bold"),
+            font=("TH Sarabun New", font_size, "bold"),
             text_color="#721C24",
             fg_color="transparent"
         )
-        error_label.pack(pady=20)
+        error_label.pack(pady=(25 if is_patient_mode else 20))
         
         self.medication_labels.extend([error_card, error_label])
     def check_network_and_update_buttons(self):
