@@ -1204,6 +1204,10 @@ class HomePage(ctk.CTkFrame):
             except FileNotFoundError:
                 print(f"Error: {path} not found.")
 
+        # แสดงปุ่ม SOS สำหรับ Admin
+        if hasattr(self, 'call_button') and self.call_button:
+            self.call_button.place(x=550, y=35)
+
         # จัดปุ่มเป็น 2 แถว - ใช้ค่าจาก theme layout
         buttons_per_row = 7
         menu_layout = theme.get('layout', {}).get('menu_buttons', {})
@@ -1364,9 +1368,10 @@ class HomePage(ctk.CTkFrame):
         )
         self.medication_title.place(x=30, y=12 if is_patient_mode else 10)
 
-        # ปุ่มควบคุม (แสดงเฉพาะ Admin เท่านั้น)
+        # ปุ่มควบคุม (แสดงสำหรับ Admin และ User)
         is_admin_mode = (user_role == 'admin')
-        if is_admin_mode:
+        is_user_mode = (user_role == 'user')
+        if is_admin_mode or is_user_mode:
             self.refresh_button = ctk.CTkButton(
                 header_frame,
                 text="รีเซ็ต",
@@ -1603,9 +1608,10 @@ class HomePage(ctk.CTkFrame):
         )
         header_frame.place(x=10, y=10)
         
-        # ปุ่มรีเซ็ตจำนวนยา (แสดงเฉพาะ Admin เท่านั้น)
+        # ปุ่มรีเซ็ตจำนวนยา (แสดงสำหรับ Admin และ User)
         is_admin_mode = (user_role == 'admin')
-        if is_admin_mode:
+        is_user_mode = (user_role == 'user')
+        if is_admin_mode or is_user_mode:
             self.reset_counter_button = ctk.CTkButton(
                 header_frame,
                 text="รีเซ็ต",
