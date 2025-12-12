@@ -1,25 +1,22 @@
-import customtkinter
-from PIL import Image
-import pywinstyles
+from customtkinter import CTk, CTkComboBox
+# Create a custom application class "App" that inherits from CTk (Custom Tkinter)
+class App(CTk):
+    def __init__(self):
+        # Call the constructor of the parent class (CTk) using super()
+        super().__init__()
+        self.title("CTkComboBox Example")
 
-#pip install pywinstyles
+        
+        # Create a CTkComboBox
+        self.combo_box = CTkComboBox(self)
+        self.combo_box.pack(padx=20, pady=20)
+        # Adding values
+        self.combo_box.configure(values=["Option 1", "Option 2", "Option 3"])
+        # Connecting it to a callback function to print the selected option on click event
+        self.combo_box.configure(command=self.combobox_callback)
 
-HEIGHT = 500
-WIDTH = 500
+    def combobox_callback(self,choice):
+        print("combobox dropdown clicked:", choice)
 
-app = customtkinter.CTk()
-app.title("example")
-app.geometry((f"{WIDTH}x{HEIGHT}"))
-app.resizable(False, False)
-
-Label1 = customtkinter.CTkLabel(master=app, text="", image=customtkinter.CTkImage(Image.open('imgNew/home.png'), size=(500,500)),
-                                width=500, height=500)
-Label1.place(x=0, y=0)
-
-Button1 = customtkinter.CTkButton(master=app, width=255, height=172, corner_radius=48,
-                                  text='BUTTON', bg_color="#000001") 
-Button1.place(x=120, y=57)
-
-pywinstyles.set_opacity(Button1, color="#000001") # just add this line
-
+app = App()
 app.mainloop()

@@ -557,7 +557,6 @@ class login(ctk.CTkFrame):
             corner_radius=12
         )
         cb_frame.pack(fill="x", padx=10, pady=(5, 15))
-        cb_frame.grid_columnconfigure(0, weight=1)
         
         # Mapping ระหว่างชื่อภาษาไทยกับค่า urole
         self.role_mapping = {
@@ -566,15 +565,14 @@ class login(ctk.CTkFrame):
             "ผู้ดูแล": "admin"
         }
         
-        # ==== Combobox (ตกแต่งให้เหมือนภาพ) ====
+        # ==== Combobox ====
         self.role_combobox = ctk.CTkComboBox(
             cb_frame,
             values=["ผู้ป่วย", "ผู้ใช้งาน", "ผู้ดูแล"],
             variable=self.user_role_var,
             font=("TH Sarabun New", 20, "bold"),
-            width=260,
             height=40,
-            dropdown_font=("TH Sarabun New", 18),
+            dropdown_font=("TH Sarabun New", 25),
 
             fg_color="#FFFFFF",
             button_color="#8acbff",
@@ -589,7 +587,7 @@ class login(ctk.CTkFrame):
             dropdown_text_color="#1D3557",
             dropdown_hover_color="#E5F4FF"
         )
-        self.role_combobox.grid(row=0, column=0, padx=15, pady=10, sticky="ew")
+        self.role_combobox.pack(fill="x", padx=15, pady=10)
         self.role_combobox.set("ผู้ป่วย")
         
         # === ช่องกรอกอีเมล - แก้ไขส่วนนี้ ===
@@ -850,7 +848,8 @@ class HomePage(ctk.CTkFrame):
             image=self.battery_images.get(100, self.battery_images.get('default')),
             text="", 
             bg_color="#8acaef",
-            fg_color="transparent"
+            fg_color="transparent",
+            corner_radius=0,  # มุมโค้งมน
         )
         self.battery_label.place(x=830, y=40)
         
@@ -860,7 +859,7 @@ class HomePage(ctk.CTkFrame):
             font=("TH Sarabun New", 28, "bold"),
             text_color="black",
             bg_color="#8acaef",
-            fg_color="transparent"
+            fg_color="transparent",
         )
         self.battery_percent_label.place(x=942, y=70, anchor="center")
         
@@ -1511,9 +1510,20 @@ class HomePage(ctk.CTkFrame):
         )
         user_icon.place(x=10, y=10 if is_patient_mode else 8)
 
+        # สร้าง mapping สำหรับแสดงชื่อระดับ
+        role_display_names = {
+            "patient": "ผู้ป่วย",
+            "user": "ผู้ใช้งาน",
+            "admin": "ผู้ดูแล"
+        }
+        
+        # ดึงชื่อระดับตาม role
+        role_display = role_display_names.get(user_role, "")
+        title_text = f"ข้อมูลผู้ใช้ ({role_display})" if role_display else "ข้อมูลผู้ใช้"
+        
         self.user_info_title = ctk.CTkLabel(
             header_frame,
-            text="ข้อมูลผู้ใช้",
+            text= "ข้อมูลผู้ใช้ (" + role_display + ")",
             font=("TH Sarabun New", title_font_size, "bold"),
             text_color="#000000",
             fg_color="transparent"
@@ -5284,9 +5294,30 @@ class Report1(ctk.CTkFrame):
 
             try:
                 date_obj = row['time_get']
-                month_th = thai_months[date_obj.month - 1]
-                dt = f"{date_obj.day:02d} {month_th} {date_obj.year + 543} เวลา {date_obj.strftime('%H:%M')}"
-            except Exception:
+                
+                # ถ้าเป็น string ให้แปลงเป็น datetime object
+                if isinstance(date_obj, str):
+                    # ลองแปลงรูปแบบต่างๆ
+                    try:
+                        date_obj = datetime.strptime(date_obj, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        try:
+                            date_obj = datetime.strptime(date_obj, "%Y-%m-%d %H:%M:%S.%f")
+                        except ValueError:
+                            try:
+                                date_obj = datetime.strptime(date_obj, "%Y-%m-%d")
+                            except ValueError:
+                                dt = "ไม่สามารถแสดงวันที่"
+                                raise ValueError("ไม่สามารถแปลงวันที่ได้")
+                
+                # ถ้าเป็น None หรือไม่มีค่า
+                if date_obj is None:
+                    dt = "ไม่สามารถแสดงวันที่"
+                else:
+                    month_th = thai_months[date_obj.month - 1]
+                    dt = f"{date_obj.day:02d} {month_th} {date_obj.year + 543} เวลา {date_obj.strftime('%H:%M')}"
+            except Exception as e:
+                print(f"Error formatting date: {e}, row['time_get'] = {row.get('time_get', 'N/A')}")
                 dt = "ไม่สามารถแสดงวันที่"
 
             name = row['medicine_1'] if row['medicine_1'] else "ไม่มีข้อมูล"
