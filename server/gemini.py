@@ -53,7 +53,7 @@ class Gemini:
                     """
             #ส่งข้อมูล
              response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents= prompt
             )
             
@@ -88,7 +88,7 @@ class Gemini:
         
             #ส่งข้อมูล
              response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents= prompts
             )
             
