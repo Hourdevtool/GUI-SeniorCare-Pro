@@ -561,14 +561,14 @@ class login(ctk.CTkFrame):
         # Mapping ระหว่างชื่อภาษาไทยกับค่า urole
         self.role_mapping = {
             "ผู้ป่วย": "patient",
-            "ผู้ใช้งาน": "user",
-            "ผู้ดูแล": "admin"
+            "ผู้ดูแลผู้ป่วย": "user",
+            "ผู้ดูแลระบบ": "admin"
         }
         
         # ==== Combobox ====
         self.role_combobox = ctk.CTkComboBox(
             cb_frame,
-            values=["ผู้ป่วย", "ผู้ใช้งาน", "ผู้ดูแล"],
+            values=["ผู้ป่วย", "ผู้ดูแลผู้ป่วย", "ผู้ดูแลระบบ"],
             variable=self.user_role_var,
             font=("TH Sarabun New", 20, "bold"),
             height=40,
@@ -696,14 +696,14 @@ class login(ctk.CTkFrame):
 
                         self.controller.notifier.show_notification(result['message'], success=True)
 
-                        def go_wifi():
-                            try:
-                                controller._previous_frame_class = Wificonnect
-                            except Exception:
-                                pass
+                        def go_home():
+                            # ป้องกันไม่ให้ hide_loading นำทางไปหน้าอื่นแบบไม่อัพเดท (call_on_show=False)
+                            controller._previous_frame_class = None 
                             controller.hide_loading()
+                            # สั่งให้ไปหน้า HomePage พร้อมเรียก on_show() เพื่ออัพเดทข้อมูล
+                            controller.show_frame(HomePage)
 
-                        controller.after(0, go_wifi)
+                        controller.after(0, go_home)
                     else:
                         self.controller.notifier.show_notification(result['message'], success=False)
                         controller.after(0, controller.hide_loading)
@@ -773,15 +773,18 @@ class HomePage(ctk.CTkFrame):
             user_role = self.controller.user.get('urole', '').lower()
         
         # แสดงปุ่ม SOS สำหรับทุก role (Patient, User, และ Admin)
+        # แสดงปุ่ม SOS เฉพาะ role 'patient'
         if hasattr(self, 'call_button') and self.call_button:
-            # แสดงปุ่ม SOS สำหรับทุก role
-            # ตรวจสอบว่าปุ่มยังไม่ได้ถูก place อยู่แล้ว
-            try:
-                self.call_button.place_info()
-            except:
-                # ถ้ายังไม่ได้ place ให้ place
-                self.call_button.place(x=550, y=35)
-                self.reset_sos_button()
+            if user_role == 'patient':
+                # แสดงปุ่ม SOS สำหรับ patient
+                try:
+                    self.call_button.place_info()
+                except:
+                    self.call_button.place(x=550, y=35)
+                    self.reset_sos_button()
+            else:
+                # ซ่อนปุ่ม SOS สำหรับ role อื่น
+                self.call_button.place_forget()
        
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -1109,9 +1112,9 @@ class HomePage(ctk.CTkFrame):
                 except FileNotFoundError:
                     print(f"Error: {path} not found.")
             
-            # แสดงปุ่ม SOS สำหรับ User
+            # ซ่อนปุ่ม SOS สำหรับ User (เผื่อกรณีค้าง)
             if hasattr(self, 'call_button') and self.call_button:
-                self.call_button.place(x=550, y=35)
+                self.call_button.place_forget()
             
             # จัดปุ่มเป็น 1 แถว - ใช้ค่าจาก theme layout
             menu_layout = theme.get('layout', {}).get('menu_buttons', {})
@@ -1167,34 +1170,25 @@ class HomePage(ctk.CTkFrame):
                     self.button_original_styles[i] = style
             return
 
-        # Level 1: Admin (ผู้ดูแลระบบ) - Show full menu (all buttons)
+        # Level 1: Admin (ผู้ดูแลระบบ) - Show restricted menu (User Info, Medication Info, Logout, Shutdown)
         btn_size = (100, 100)
         btn_images = {}
-        pressure = 0
-        if hasattr(self.controller, 'user') and self.controller.user and 'pressure' in self.controller.user:
-            pressure = self.controller.user['pressure']
-
-        if pressure == 1:
-            paths = [
-                f"{PATH}imgNew/iconuser.png", f"{PATH}imgNew/icontime.png", f"{PATH}imgNew/iconheath.png",
-                f"{PATH}imgNew/icondog.png", f"{PATH}imgNew/iconreport.png", f"{PATH}imgNew/iconout.png",
-                f"{PATH}imgNew/icondow.png"
-            ]
-            btn_texts = [
-                "ข้อมูลผู้ใช้", "ตั้งเวลา", "สุขภาพ",
-                "ข้อมูลยา", "รายงาน", "ออกระบบ", "ปิดเครื่อง"
-            ]
-        else:
-            paths = [
-                f"{PATH}imgNew/iconuser.png", f"{PATH}imgNew/icontime.png",
-                f"{PATH}imgNew/icondog.png", f"{PATH}imgNew/iconreport.png", f"{PATH}imgNew/iconout.png",
-                f"{PATH}imgNew/icondow.png"
-            ]
-            btn_texts = [
-                "ข้อมูลผู้ใช้", "ตั้งเวลา",
-                "ข้อมูลยา", "รายงาน", "ออกระบบ", "ปิดเครื่อง"
-            ]
-        pages = [info, Frame3, Frame4, Frame2, ReportFrame, login]
+        
+        # กำหนดปุ่มสำหรับ Admin ตามที่ต้องการ: ข้อมูลผู้ใช้, ข้อมูลยา, ออกระบบ, ปิดเครื่อง
+        paths = [
+            f"{PATH}imgNew/iconuser.png", 
+            f"{PATH}imgNew/icondog.png", 
+            f"{PATH}imgNew/iconout.png",
+            f"{PATH}imgNew/icondow.png"
+        ]
+        btn_texts = [
+            "ข้อมูลผู้ใช้", 
+            "ข้อมูลยา", 
+            "ออกระบบ", 
+            "ปิดเครื่อง"
+        ]
+        # Pages mapping: info -> ข้อมูลผู้ใช้, Frame2 -> ข้อมูลยา, login -> ออกระบบ, None -> ปิดเครื่อง
+        pages = [info, Frame2, login, None]
 
         for i, path in enumerate(paths, start=1):
             try:
@@ -1203,34 +1197,38 @@ class HomePage(ctk.CTkFrame):
             except FileNotFoundError:
                 print(f"Error: {path} not found.")
 
-        # แสดงปุ่ม SOS สำหรับ Admin
+        # ซ่อนปุ่ม SOS สำหรับ Admin
         if hasattr(self, 'call_button') and self.call_button:
-            self.call_button.place(x=550, y=35)
+            self.call_button.place_forget()
 
-        # จัดปุ่มเป็น 2 แถว - ใช้ค่าจาก theme layout
-        buttons_per_row = 7
-        menu_layout = theme.get('layout', {}).get('menu_buttons', {})
-        btn_width = menu_layout.get('btn_width', 100)
-        btn_height = menu_layout.get('btn_height', 90)
-        start_x = menu_layout.get('start_x', 30)
-        start_y = menu_layout.get('start_y', 600)
+        # จัดปุ่มให้อยู่กึ่งกลางและกระจายตัวสวยงาม
+        btn_width = 100
+        spacing = 160 # เพิ่มระยะห่างให้ดูเต็ม
+        screen_width = 1024
+        total_buttons = len(paths)
+        
+        total_content_width = (total_buttons * btn_width) + ((total_buttons - 1) * spacing)
+        start_x = (screen_width - total_content_width) // 2
+        start_y = 600
 
-        for i in range(7):
+        for i in range(len(paths)):
             if i + 1 in btn_images:
                 text = btn_texts[i]
                 
-                # คำนวณตำแหน่งแถวและคอลัมน์
-                row = i // buttons_per_row
-                col = i % buttons_per_row
-                
-                x_pos = start_x + col * (btn_width + 40)  # เว้นระยะแนวนอนมากขึ้น
-                y_pos = start_y + row * (btn_height + 30) # เว้นระยะแนวตั้งมากขึ้น
+                # คำนวณตำแหน่ง (แถวเดียว)
+                x_pos = start_x + i * (btn_width + spacing)
+                y_pos = start_y
 
 
                 # คำสั่งของแต่ละปุ่ม
-                if i == 5:
+                # index 0: ข้อมูลผู้ใช้ -> pages[0]
+                # index 1: ข้อมูลยา -> pages[1]
+                # index 2: ออกระบบ -> confirm_logout
+                # index 3: ปิดเครื่อง -> shutdown_system
+                
+                if i == 2: # Logout
                     command = self.confirm_logout
-                elif i == 6:
+                elif i == 3: # Shutdown
                     command = self.shutdown_system
                 else:
                     command = lambda i=i: controller.show_frame(pages[i])
@@ -1513,8 +1511,8 @@ class HomePage(ctk.CTkFrame):
         # สร้าง mapping สำหรับแสดงชื่อระดับ
         role_display_names = {
             "patient": "ผู้ป่วย",
-            "user": "ผู้ใช้งาน",
-            "admin": "ผู้ดูแล"
+            "user": "ผู้ดูแลผู้ป่วย",
+            "admin": "ผู้ดูแลระบบ"
         }
         
         # ดึงชื่อระดับตาม role
@@ -2599,19 +2597,34 @@ class HomePage(ctk.CTkFrame):
 
             if current_status == "offline":
                 print("HomePage: Network is OFFLINE, disabling buttons.")
-                skip = [1,5,6]
+                # รายชื่อปุ่มที่อนุญาตให้ใช้ตอน Offline
+                allowed_buttons = ["ตั้งเวลา", "ออกระบบ", "ปิดเครื่อง"]
+                
                 for i, btn in self.menu_buttons.items():
-                    
-                    if i in skip : 
-                        continue 
-                    
-                    btn.configure(
-                        state="disabled",
-                        fg_color="#E0E0E0",      # สีเทา
-                        hover_color="#E0E0E0",     # สีเทา
-                        text_color="#9E9E9E",    # สีเทา
-                        border_color="#BDBDBD"   # สีเทา
-                    )
+                    try:
+                        btn_text = btn.cget("text")
+                        if btn_text in allowed_buttons:
+                            # เปิดใช้งานปุ่มที่อนุญาต
+                            if i in self.button_original_styles:
+                                style = self.button_original_styles[i]
+                                btn.configure(
+                                    state="normal",
+                                    fg_color=style['fg_color'],
+                                    hover_color=style['hover_color'],
+                                    text_color=style['text_color'],
+                                    border_color=style['border_color']
+                                )
+                        else:
+                            # ปิดใช้งานปุ่มอื่นๆ
+                            btn.configure(
+                                state="disabled",
+                                fg_color="#E0E0E0",
+                                hover_color="#E0E0E0",
+                                text_color="#9E9E9E",
+                                border_color="#BDBDBD"
+                            )
+                    except Exception as e:
+                        print(f"Error updating button {i}: {e}")
                 # อัปเดตปุ่ม SOS ให้เป็นสีเทาและเปลี่ยนรูปเป็นออฟไลน์
                 if hasattr(self, 'call_button') and self.call_button:
                     self.call_button.configure(
@@ -2625,28 +2638,41 @@ class HomePage(ctk.CTkFrame):
                 
                 # อัปเดตปุ่มรีเฟรชและรีเซ็ตให้เป็นสีเทาและกดไม่ได้
                 if hasattr(self, 'setting_button') and self.setting_button:
-                    self.setting_button.configure(
-                        state="disabled",
-                        fg_color="#E0E0E0",
-                        hover_color="#E0E0E0",
-                        text_color="#9E9E9E"
-                    )
+                    # คืนค่าสไตล์เดิมถ้ามี
+                    if hasattr(self, 'setting_button_original_style'):
+                        style = self.setting_button_original_style
+                        self.setting_button.configure(
+                            state="normal",
+                            fg_color=style['fg_color'],
+                            hover_color=style['hover_color'],
+                            text_color=style['text_color']
+                        )
+                    else:
+                        self.setting_button.configure(state="normal")
                 
                 if hasattr(self, 'refresh_button') and self.refresh_button:
-                    self.refresh_button.configure(
-                        state="disabled",
-                        fg_color="#E0E0E0",
-                        hover_color="#E0E0E0",
-                        text_color="#9E9E9E"
-                    )
+                    if hasattr(self, 'refresh_button_original_style'):
+                        style = self.refresh_button_original_style
+                        self.refresh_button.configure(
+                            state="normal",
+                            fg_color=style['fg_color'],
+                            hover_color=style['hover_color'],
+                            text_color=style['text_color']
+                        )
+                    else:
+                        self.refresh_button.configure(state="normal")
                 
                 if hasattr(self, 'reset_counter_button') and self.reset_counter_button:
-                    self.reset_counter_button.configure(
-                        state="disabled",
-                        fg_color="#E0E0E0",
-                        hover_color="#E0E0E0",
-                        text_color="#9E9E9E"
-                    )
+                    if hasattr(self, 'reset_counter_button_original_style'):
+                        style = self.reset_counter_button_original_style
+                        self.reset_counter_button.configure(
+                            state="normal",
+                            fg_color=style['fg_color'],
+                            hover_color=style['hover_color'],
+                            text_color=style['text_color']
+                        )
+                    else:
+                        self.reset_counter_button.configure(state="normal")
             else:
                 # --- เน็ตออนไลน์: คืนค่าปุ่มเป็นปกติ ---
                 print("HomePage: Network is ONLINE, enabling buttons.")
@@ -3353,7 +3379,11 @@ class Frame4(ctk.CTkFrame):
                         sendtoLine(self.controller.user['token_line'],self.controller.user['group_id'],user_report)
                         sendtoLine(self.controller.user['token_line'],self.controller.user['group_id'],ai_advice['Advice'])
                         self.controller.notifier.show_notification("บันทึกคำแนะนำสำเร็จ", success=True)
-                        controller.after(0, lambda: controller.show_frame(AIgen))
+                        def show_ai_gen():
+                            controller._previous_frame_class = None
+                            controller.hide_loading()
+                            controller.show_frame(AIgen)
+                        controller.after(0, show_ai_gen)
                     else:
                         self.controller.notifier.show_notification(ai_advice['message'], success=False)
                         controller.after(0, controller.hide_loading)
