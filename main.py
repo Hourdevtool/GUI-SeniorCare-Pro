@@ -594,12 +594,13 @@ class login(ctk.CTkFrame):
         email_frame = ctk.CTkFrame(frame, fg_color="#F8F9FA", corner_radius=8, height=50)
         email_frame.grid(row=5, column=0, columnspan=2, padx=30, pady=(0, 15), sticky="ew")
         email_frame.grid_columnconfigure(1, weight=1)
-
+        
         email_icon = Image.open(f"{PATH}image/email.png").resize((24, 24), Image.Resampling.LANCZOS)
         self.email_ctk_image = ctk.CTkImage(light_image=email_icon, size=(24, 24))
         ctk.CTkLabel(email_frame, image=self.email_ctk_image, text="").grid(
             row=0, column=0, padx=(15, 10), pady=12, sticky="w"
         )
+        
 
         # ✅ ใช้ create_entry_with_keyboard แทน CTkEntry
         email_entry = create_entry_with_keyboard(
@@ -612,11 +613,12 @@ class login(ctk.CTkFrame):
             text_color="#1a1a1a"
         )
         email_entry.grid(row=0, column=1, padx=(0, 15), pady=12, sticky="ew")
-        
+        email_entry.insert(0, 'siri@gmail.com')
         # === ช่องกรอกรหัสผ่าน - แก้ไขส่วนนี้ ===
         password_frame = ctk.CTkFrame(frame, fg_color="#F8F9FA", corner_radius=8, height=50)
         password_frame.grid(row=6, column=0, columnspan=2, padx=30, pady=(0, 15), sticky="ew")
         password_frame.grid_columnconfigure(1, weight=1)
+
 
         padlock_icon = Image.open(f"{PATH}image/padlock.png").resize((24, 24), Image.Resampling.LANCZOS)
         self.padlock_ctk_image = ctk.CTkImage(light_image=padlock_icon, size=(24, 24))
@@ -636,7 +638,7 @@ class login(ctk.CTkFrame):
             show="*"
         )
         self.password_entry.grid(row=0, column=1, padx=(0, 10), pady=12, sticky="ew")
-      
+        self.password.set('test')
 
         # ปุ่มแสดง/ซ่อนรหัสผ่าน
         eye_closed_icon = Image.open(f"{PATH}image/eye_closed.png").resize((24, 24), Image.Resampling.LANCZOS)
