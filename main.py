@@ -5514,7 +5514,8 @@ class Report2(ctk.CTkFrame):
             result = heart_report().generate_advice(self.controller.user['id'])
             
             if result['status']:
-                ai_text = result['advices']  # 🚀 ประหยัด 10-20 วินาที!
+                ai_text = result['advices']  
+                print("ai_text", ai_text)# 🚀 ประหยัด 10-20 วินาที!
                 
                 self.controller.notifier.show_notification("โหลดข้อมูลสุขภาพสำเร็จ", success=True)
                 self.after(0, lambda: self.update_ui(result, ai_text))

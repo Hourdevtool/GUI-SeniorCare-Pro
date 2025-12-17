@@ -53,7 +53,7 @@ class Gemini:
                     """
             #ส่งข้อมูล
              response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.5-flash-lite",
                 contents= prompt
             )
             
@@ -80,15 +80,15 @@ class Gemini:
              else:
                 return  {'status':False,'message':responseformat['message']}
 
-        except:
-            return {'status':False,'message':'เกิดข้อผิดพลาดในการประมวลผลคำ'}    
+        except Exception as e:
+            return {'status':False,'message': f'เกิดข้อผิดพลาดในการประมวลผลคำ: {e}'}    
 
     def Advice(self,prompts):
         try:
         
             #ส่งข้อมูล
              response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.5-flash-lite" ,
                 contents= prompts
             )
             
@@ -98,5 +98,5 @@ class Gemini:
 
              return Advice
 
-        except:
-            return {'status':False,'message':'เกิดข้อผิดพลาดในการประมวลผลคำ'}    
+        except Exception as e:
+            return {'status':False,'message': f'เกิดข้อผิดพลาดในการประมวลผลคำ: {e}'}    
