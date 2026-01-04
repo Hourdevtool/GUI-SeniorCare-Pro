@@ -1,10 +1,37 @@
-/server/__pycache__
-/lib/__pycache__
-/user_data.json
-/*Database
-/__pycache__
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment
 .env
-/meal_config.json
-/offline_schedule_queue.json
-/offline_medicineData.json
-/time_data.json
+.venv
+env/
+venv/
+
+# User data and temporary files
+user_data.json
+meal_config.json
+offline_schedule_queue.json
+offline_medicineData.json
+time_data.json
+
+# Database
+*Database/
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
