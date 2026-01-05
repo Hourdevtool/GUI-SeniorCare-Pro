@@ -321,11 +321,33 @@ class Frame4(ctk.CTkFrame):
                         sendtoLine(self.controller.user['token_line'],self.controller.user['group_id'],user_report)
                         sendtoLine(self.controller.user['token_line'],self.controller.user['group_id'],ai_advice['Advice'])
                         self.controller.notifier.show_notification("บันทึกคำแนะนำสำเร็จ", success=True)
-                        def show_ai_gen():
-                            controller._previous_frame_class = None
-                            controller.hide_loading()
-                            controller.show_frame(AIgen)
-                        controller.after(0, show_ai_gen)
+                        
+                        # อัปเดตข้อความ loading เพื่อบอกว่ากำลังเตรียมข้อมูล
+                        controller.after(0, lambda: controller.show_loading("กำลังเตรียมคำแนะนำ...", "กรุณารอสักครู่"))
+                        
+                        # เตรียมข้อมูลใน thread แยก
+                        def prepare_ai_gen():
+                            try:
+                                # เตรียม TTS file ก่อน
+                                tts = gTTS(text=ai_advice['Advice'], lang='th')
+                                tts.save("thai_voice.mp3")
+                                
+                                # เมื่อเตรียมเสร็จแล้วค่อยแสดง frame
+                                def show_ai_gen():
+                                    controller._previous_frame_class = None
+                                    controller.show_frame(AIgen)
+                                    # hide_loading จะถูกเรียกจาก AIgen.on_show() เมื่อพร้อมแล้ว
+                                controller.after(0, show_ai_gen)
+                            except Exception as e:
+                                print(f"เกิดข้อผิดพลาดในการเตรียม TTS: {e}")
+                                # แม้เกิดข้อผิดพลาดก็แสดง frame
+                                def show_ai_gen():
+                                    controller._previous_frame_class = None
+                                    controller.show_frame(AIgen)
+                                    controller.after(0, controller.hide_loading)
+                                controller.after(0, show_ai_gen)
+                        
+                        threading.Thread(target=prepare_ai_gen, daemon=True).start()
                     else:
                         self.controller.notifier.show_notification(ai_advice['message'], success=False)
                         controller.after(0, controller.hide_loading)
@@ -353,30 +375,57 @@ class AIgen(ctk.CTkFrame):
     def on_show(self):
         # modelการพูด
         print("AIgen is now visible")
+        
+        # ตรวจสอบว่ามี advice หรือไม่
+        if not hasattr(self.controller, 'advice') or not self.controller.advice:
+            print("ไม่มีข้อมูลคำแนะนำ")
+            self.controller.hide_loading()
+            return
+        
+        # อัปเดต label ก่อน
         self.label.configure(text=self.controller.advice)
-
-        tts = gTTS(text=self.controller.advice, lang='th')
-        tts.save("thai_voice.mp3")
-
-        if not mixer.get_init():
-            mixer.init()
-
-        if mixer.music.get_busy():
-            mixer.music.stop()
-
-        mixer.music.load("thai_voice.mp3")
-        mixer.music.play()
-
-        def delete_file():
-            while mixer.music.get_busy():
-                time.sleep(0.1) 
-            mixer.quit()
+        
+        # เตรียมและเล่น TTS ใน thread แยกเพื่อไม่ให้ UI ค้าง
+        def prepare_and_play_tts():
             try:
-                os.remove("thai_voice.mp3")
-            except Exception as e:
-                print("ลบไฟล์ไม่สำเร็จ:", e)
+                # ตรวจสอบว่าไฟล์ TTS มีอยู่แล้วหรือไม่ (ถูกสร้างไว้แล้วใน save_and_go_home)
+                if not os.path.exists("thai_voice.mp3"):
+                    # ถ้าไม่มีให้สร้างใหม่
+                    tts = gTTS(text=self.controller.advice, lang='th')
+                    tts.save("thai_voice.mp3")
 
-        threading.Thread(target=delete_file).start()    
+                # เตรียม mixer
+                if not mixer.get_init():
+                    mixer.init()
+
+                if mixer.music.get_busy():
+                    mixer.music.stop()
+
+                # โหลดและเล่นเสียง
+                mixer.music.load("thai_voice.mp3")
+                mixer.music.play()
+                
+                # ซ่อนหน้า loading หลังจากเตรียมข้อมูลเสร็จแล้ว (รอสักครู่เพื่อให้ mixer โหลดไฟล์เสร็จ)
+                time.sleep(0.2)  # รอให้ mixer โหลดไฟล์เสร็จ
+                self.controller.after(0, self.controller.hide_loading)
+
+                def delete_file():
+                    while mixer.music.get_busy():
+                        time.sleep(0.1) 
+                    mixer.quit()
+                    try:
+                        os.remove("thai_voice.mp3")
+                    except Exception as e:
+                        print("ลบไฟล์ไม่สำเร็จ:", e)
+
+                threading.Thread(target=delete_file, daemon=True).start()
+            except Exception as e:
+                print(f"เกิดข้อผิดพลาดในการเตรียม TTS: {e}")
+                # แม้เกิดข้อผิดพลาดก็ซ่อน loading
+                self.controller.after(0, self.controller.hide_loading)
+        
+        # เริ่มเตรียม TTS ใน thread แยก
+        threading.Thread(target=prepare_and_play_tts, daemon=True).start()    
 
     def stop_and_go_home(self):
         try:
