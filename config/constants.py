@@ -15,6 +15,7 @@ VOICE_PROMPTS = {
     "complete": {"text": "จ่ายยาสำเร็จค่ะ", "filename": "complete.mp3"},
     "dontpick": {"text": "ผู้ป่วยกรุณารับยาด้วยค่ะ", "filename": "dontpick.mp3"},
     "fail": {"text": "ดันยาไม่สำเร็จค่ะ", "filename": "fail.mp3"},
+    "fall_alert": {"text": "พบคนล้มค่ะ", "filename": "fall.mp3"},
 }
 
 STARTUP_GREETING = {

@@ -471,6 +471,32 @@ class HomePage(ctk.CTkFrame):
         call_button_clicked = Image.open(f"{PATH}imgNew/sos-ค้าง.png").resize((200, 200), Image.Resampling.LANCZOS)
         self.call_photo_clicked = ImageTk.PhotoImage(call_button_clicked)
         
+         # --- AI Status Icon ---
+        # User requested using emoji 📸 with green color
+        self.ai_status_label = ctk.CTkLabel(
+            self,
+            text="📸",
+            font=("Arial", 40), # Large font for icon size
+            text_color="#32CD32", # Lime Green
+            bg_color="#8acaef", # Match header background
+            fg_color="transparent"
+        )
+        # Position it near battery or date/time
+        # Battery is at 830, 40. Date/Time at 58, 185 and 365, 182.
+        # Let's put it top left or near center top? 
+        # User said "show icon camera at home page... when closed show nothing"
+        # Let's put it on the header bar, maybe left of SOS button or similar.
+        # SOS is at 550, 35 (if patient).
+        # Let's try x=480, y=40.
+        
+        # We don't place it yet, we place it in update_ai_status_icon
+        
+        # Bind to controller variable
+        if hasattr(self.controller, 'is_ai_running_var'):
+            self.controller.is_ai_running_var.trace_add('write', self.update_ai_status_icon)
+            self.update_ai_status_icon()
+
+        
         # ใช้รูปออนไลน์เป็นค่าเริ่มต้น
         self.call_photo = self.call_photo_online
         
@@ -535,6 +561,26 @@ class HomePage(ctk.CTkFrame):
                 border_width=style['border_width'],
                 corner_radius=style.get('corner_radius', 0)
             )
+
+    def update_ai_status_icon(self, *args):
+        """Show/Hide AI Camera Icon based on service status."""
+        try:
+            if not hasattr(self, 'ai_status_label') or not self.ai_status_label:
+                return
+
+            is_running = False
+            if hasattr(self.controller, 'is_ai_running_var'):
+                is_running = self.controller.is_ai_running_var.get()
+            
+            if is_running:
+                # self.ai_status_label.configure(image=self.ai_icon_photo) # No image needed
+                self.ai_status_label.place(x=780, y=35) # Adjusted y slightly for text alignment
+                print(f"AI Icon Updating: Visible at 780, 45")
+            else:
+                self.ai_status_label.place_forget()
+                print(f"AI Icon Updating: Hidden (Running={is_running})")
+        except Exception as e:
+            print(f"Error updating AI icon: {e}")
 
     def update_battery_display(self, *args):
         """อัพเดตการแสดงผลแบตเตอรี่ตามค่า battery_percent_var"""

@@ -298,6 +298,9 @@ class login(ctk.CTkFrame):
                             json.dump(result['user'], f, ensure_ascii=False, indent=4, default=default_serializer)
 
                         self.controller.notifier.show_notification(result['message'], success=True)
+                        
+                        # Start AI Service
+                        self.controller.start_ai_service()
 
                         def go_home():
                             # Import HomePage locally to avoid circular dependency

@@ -26,7 +26,9 @@ from notifier import Notifier
 from network_monitor import NetworkMonitor
 import serial
 import requests
+import multiprocessing
 #
+from models.fall_detection_service import falldetection_worker, AI_ENABLED
 
 # nodel การเเจ้งเตือน
 from lib.alert import sendtoTelegram, sendtoLine, sendtoLineWithDeduplication
@@ -91,6 +93,12 @@ class AppController(ctk.CTk):
         super().__init__()
         self.user = None
         self.is_test_account = False
+        
+        # AI Service Variables
+        self.ai_running_flag = None
+        self.ai_process = None
+        self.is_ai_running_var = ctk.BooleanVar(value=False)
+
         self.title("เครื่องโฮมแคร์อัจฉริยะควบคุมผ่านระบบ SeniorCare Pro")
         #  loop Data api
         self.polling_thread_active = False
@@ -158,6 +166,11 @@ class AppController(ctk.CTk):
         
         # โหลดข้อมูลผู้ใช้และแสดงหน้าที่เหมาะสม
         self.load_user_data()
+        
+        # Ensure AI service is started if user is loaded
+        if self.user:
+            self.start_ai_service()
+            
         self.start_serial_thread()
 
         if hasattr(self, 'user') and isinstance(self.user, dict) and 'id' in self.user:
@@ -175,6 +188,58 @@ class AppController(ctk.CTk):
                  print("Cannot start Network Monitor: 'id' not found in self.user.")
         else:
             print("self.user not defined or loaded yet. Network Monitor not started.")
+
+
+    
+    def start_ai_service(self):
+        """Start the Fall Detection AI Service in a separate process."""
+        if not AI_ENABLED:
+            print("[AppController] AI Service is DISABLED via hardcode.")
+            return
+
+        if self.ai_process and self.ai_process.is_alive():
+            print("[AppController] AI Service is already running.")
+            return
+
+        if not self.user:
+            print("[AppController] Cannot start AI: No user loaded.")
+            return
+
+        print("[AppController] Starting AI Service...")
+        
+        # Prepare arguments
+        user_line_token = self.user.get('token_line', '')
+        user_line_group_id = self.user.get('group_id', '')
+        
+        # Create synchronization flag
+        self.ai_running_flag = multiprocessing.Value('b', True)
+        
+        # Spawn Process
+        self.ai_process = multiprocessing.Process(
+            target=falldetection_worker,
+            args=(self.ai_running_flag, user_line_token, user_line_group_id),
+            daemon=True
+        )
+        self.ai_process.start()
+        self.is_ai_running_var.set(True)
+        print(f"[AppController] AI Service started (PID: {self.ai_process.pid})")
+
+    def stop_ai_service(self):
+        """Stop the Fall Detection AI Service."""
+        if self.ai_running_flag:
+            self.ai_running_flag.value = False
+        
+        if self.ai_process and self.ai_process.is_alive():
+            print("[AppController] Stopping AI Service...")
+            self.ai_process.join(timeout=2)
+            if self.ai_process.is_alive():
+                print("[AppController] AI Service did not stop gracefully, terminating...")
+                self.ai_process.terminate()
+        
+        self.ai_process = None
+        self.ai_running_flag = None
+        self.is_ai_running_var.set(False)
+        print("[AppController] AI Service stopped.")
 
     def login_mode(self):
         if self.user and self.user.get('email') == TEST_MODE_EMAIL:
@@ -910,6 +975,10 @@ class AppController(ctk.CTk):
                     home_frame = self.frames.get(HomePage)
                     if home_frame:
                         home_frame.update_test_mode_visibility()
+                    
+                    # Start AI Service automatically
+                    self.start_ai_service()
+                    
                     self.show_frame(login)
             except Exception as e:
                 print(f"Error loading user_data.json: {e}")
@@ -1026,7 +1095,12 @@ class AppController(ctk.CTk):
             if hasattr(self, 'network_monitor') and self.network_monitor.is_alive():
                 print("Stopping Network Monitor...")
                 self.network_monitor.stop()
+                self.network_monitor.stop()
                 self.network_monitor.join() 
+            
+            # --- หยุด AI Service ก่อนปิด ---
+            self.stop_ai_service()
+            # ------------------------------- 
             # ------------------------------------------
             
             print("Closing application...")
