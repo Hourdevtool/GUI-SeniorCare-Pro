@@ -374,6 +374,9 @@ class HomePage(ctk.CTkFrame):
             else:
                 # ซ่อนปุ่ม SOS สำหรับ role อื่น
                 self.call_button.place_forget()
+
+        # 🟢 Restart Clock Loop to prevent frozen time
+        self.update_datetime()
        
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -2089,54 +2092,83 @@ class HomePage(ctk.CTkFrame):
             self.show_medication_error()
 
                             
-    def update_datetime(self):
-        """อัพเดทวันที่และเวลาพร้อมเอฟเฟ็กต์"""
-        today = datetime.today()
-        
-        # จัดรูปแบบวันที่ให้สั้นและเข้าใจง่าย
-        thai_months = [
-            "", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
-            "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
-        ]
-        
-        thai_days = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
-        
-        day_name = thai_days[today.weekday()]
-        day = today.day
-        month = thai_months[today.month]
-        year = today.year + 543  # แปลงเป็น พ.ศ.
-        
-        date_text = f"{day_name} {day} {month} {year}"
-        self.date_label.configure(text=date_text)
-
-        # จัดรูปแบบเวลาพร้อมวินาที
-        current_time = time.strftime("%H:%M:%S")
-        self.time_label.configure(text=current_time)
-        
-        # เปลี่ยนสีของเวลาตามช่วงเวลา
-        hour = today.hour
-        if 6 <= hour < 12:
-            time_color = "#DC0000"  # สีส้ม (เช้า)
-        elif 12 <= hour < 18:
-            time_color = "#F4B342"  # สีเหลือง (บ่าย)
-        elif 18 <= hour < 22:
-            time_color = "#C47BE4"  # สีม่วง (เย็น)
-        else:
-            time_color = "#301CA0"  # สีเข้ม (กลางคืน)
-            
-        self.time_label.configure(text_color=time_color)
-        
-        # อัพเดทสถานะระบบ
-        self.update_system_status()
-        
-        self.check_network_and_update_buttons()
-        # เรียกฟังก์ชันนี้ใหม่ทุก 1 วินาที (ตรวจสอบว่าหน้าต่างยังอยู่)
+    def _get_board_time(self):
+        """
+        พยายามดึงเวลาจากบอร์ด (Raspberry Pi/External Board)
+        หากไม่สำเร็จจะคืนค่า None เพื่อให้ระบบใช้เวลาจาก System Time แทน
+        """
         try:
-            if self.winfo_exists():
-                self.after(1000, self.update_datetime)
-        except:
-            # หน้าต่างถูกทำลายแล้ว ไม่ต้องทำอะไร
-            pass
+            # TODO: ใส่ Logic การดึงเวลาจาก Serial/RTC ของบอร์ดที่นี่ในอนาคต
+            # ตอนนี้ให้ถือว่าดึงไม่ได้ (Return None) เพื่อให้ Fallback ไปใช้ System Time (datetime.now())
+            # ซึ่งบน Raspberry Pi เวลา System Time ก็ควรจะเป็นเวลาที่ถูกต้องอยู่แล้ว
+            return None 
+        except Exception as e:
+            print(f"Error fetching board time: {e}")
+            return None
+
+    def update_datetime(self):
+        """อัพเดทวันที่และเวลาพร้อมเอฟเฟ็กต์ (Robust Version)"""
+        try:
+            # 1. พยายามดึงเวลาจากบอร์ดก่อน
+            current_dt = self._get_board_time()
+            
+            # 2. ถ้าดึงไม่ได้ ให้ใช้เวลาจาก System (เครื่อง)
+            if current_dt is None:
+                current_dt = datetime.now()
+                
+            # *หมายเหตุ: บน Raspberry Pi, datetime.now() คือเวลาของบอร์ดอยู่แล้ว
+            
+            # จัดรูปแบบวันที่ให้สั้นและเข้าใจง่าย
+            thai_months = [
+                "", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+                "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+            ]
+            
+            thai_days = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
+            
+            day_name = thai_days[current_dt.weekday()]
+            day = current_dt.day
+            month = thai_months[current_dt.month]
+            year = current_dt.year + 543  # แปลงเป็น พ.ศ.
+            
+            date_text = f"{day_name} {day} {month} {year}"
+            if self.date_label.cget("text") != date_text:
+                 self.date_label.configure(text=date_text)
+
+            # จัดรูปแบบเวลาพร้อมวินาที
+            current_time_str = current_dt.strftime("%H:%M:%S")
+            self.time_label.configure(text=current_time_str)
+            
+            # เปลี่ยนสีของเวลาตามช่วงเวลา
+            hour = current_dt.hour
+            if 6 <= hour < 12:
+                time_color = "#DC0000"  # สีส้ม (เช้า)
+            elif 12 <= hour < 18:
+                time_color = "#F4B342"  # สีเหลือง (บ่าย)
+            elif 18 <= hour < 22:
+                time_color = "#C47BE4"  # สีม่วง (เย็น)
+            else:
+                time_color = "#301CA0"  # สีเข้ม (กลางคืน)
+                
+            self.time_label.configure(text_color=time_color)
+            
+            # อัพเดทสถานะระบบ (Safe call)
+            self.update_system_status()
+            
+            # เช็ค Network แบบ Non-blocking
+            self.check_network_and_update_buttons()
+            
+        except Exception as e:
+            print(f"Error in update_datetime: {e}")
+            
+        finally:
+            # สำคัญ: เรียกตัวเองซ้ำเสมอ ไม่ว่าจะเกิด error หรือไม่
+            # เพื่อป้องกันนาฬิกาหยุดเดิน
+            try:
+                if self.winfo_exists():
+                    self.after(1000, self.update_datetime)
+            except:
+                pass
 
     def update_system_status(self):
         """อัพเดทสถานะระบบ"""
