@@ -372,76 +372,10 @@ class Frame4(ctk.CTkFrame):
 
 
 class AIgen(ctk.CTkFrame):
-    def on_show(self):
-        # modelการพูด
-        print("AIgen is now visible")
-        
-        # ตรวจสอบว่ามี advice หรือไม่
-        if not hasattr(self.controller, 'advice') or not self.controller.advice:
-            print("ไม่มีข้อมูลคำแนะนำ")
-            self.controller.hide_loading()
-            return
-        
-        # อัปเดต label ก่อน
-        self.label.configure(text=self.controller.advice)
-        
-        # เตรียมและเล่น TTS ใน thread แยกเพื่อไม่ให้ UI ค้าง
-        def prepare_and_play_tts():
-            try:
-                # ตรวจสอบว่าไฟล์ TTS มีอยู่แล้วหรือไม่ (ถูกสร้างไว้แล้วใน save_and_go_home)
-                if not os.path.exists("thai_voice.mp3"):
-                    # ถ้าไม่มีให้สร้างใหม่
-                    tts = gTTS(text=self.controller.advice, lang='th')
-                    tts.save("thai_voice.mp3")
-
-                # เตรียม mixer
-                if not mixer.get_init():
-                    mixer.init()
-
-                if mixer.music.get_busy():
-                    mixer.music.stop()
-
-                # โหลดและเล่นเสียง
-                mixer.music.load("thai_voice.mp3")
-                mixer.music.play()
-                
-                # ซ่อนหน้า loading หลังจากเตรียมข้อมูลเสร็จแล้ว (รอสักครู่เพื่อให้ mixer โหลดไฟล์เสร็จ)
-                time.sleep(0.2)  # รอให้ mixer โหลดไฟล์เสร็จ
-                self.controller.after(0, self.controller.hide_loading)
-
-                def delete_file():
-                    while mixer.music.get_busy():
-                        time.sleep(0.1) 
-                    mixer.quit()
-                    try:
-                        os.remove("thai_voice.mp3")
-                    except Exception as e:
-                        print("ลบไฟล์ไม่สำเร็จ:", e)
-
-                threading.Thread(target=delete_file, daemon=True).start()
-            except Exception as e:
-                print(f"เกิดข้อผิดพลาดในการเตรียม TTS: {e}")
-                # แม้เกิดข้อผิดพลาดก็ซ่อน loading
-                self.controller.after(0, self.controller.hide_loading)
-        
-        # เริ่มเตรียม TTS ใน thread แยก
-        threading.Thread(target=prepare_and_play_tts, daemon=True).start()    
-
-    def stop_and_go_home(self):
-        try:
-            if mixer.get_init() and mixer.music.get_busy():
-                mixer.music.stop()
-            mixer.quit()
-            if os.path.exists('thai_voice.mp3'):
-                os.remove("thai_voice.mp3")  
-        except Exception as e:
-            print(f"เกิดข้อผิดพลาดขณะลบไฟล์: {e}")
-        
-        self.controller.show_frame(HomePage)
-
     def __init__(self, parent, controller):
         super().__init__(parent, width=1024, height=800)
         self.controller = controller
+        self.cleanup_lock = threading.Lock() # Lock for synchronization
         
         bg_image = Image.open(f"{PATH}image/report.png").resize((1024, 800), Image.Resampling.LANCZOS)
         self.bg_ctk_image = ctk.CTkImage(light_image=bg_image, size=(1024, 800))
@@ -502,6 +436,93 @@ class AIgen(ctk.CTkFrame):
             wraplength=680  
         )
         self.label.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+    def cleanup_audio(self):
+        """Safely stop mixer and delete audio file using a lock."""
+        with self.cleanup_lock:
+            try:
+                # Check if mixer is initialized before trying to interact with it
+                if mixer.get_init():
+                    if mixer.music.get_busy():
+                        mixer.music.stop()
+                    mixer.quit()
+                
+                # Delete the file if it exists
+                if os.path.exists("thai_voice.mp3"):
+                    # wait a tiny bit to ensure file handle is released
+                    time.sleep(0.1) 
+                    try:
+                        os.remove("thai_voice.mp3")
+                    except PermissionError:
+                        print("File is still in use, retrying removal...")
+                        time.sleep(0.5)
+                        if os.path.exists("thai_voice.mp3"):
+                             os.remove("thai_voice.mp3")
+            except Exception as e:
+                print(f"Error during audio cleanup: {e}")
+
+    def on_show(self):
+        # modelการพูด
+        print("AIgen is now visible")
+        
+        # ตรวจสอบว่ามี advice หรือไม่
+        if not hasattr(self.controller, 'advice') or not self.controller.advice:
+            print("ไม่มีข้อมูลคำแนะนำ")
+            self.controller.hide_loading()
+            return
+        
+        # อัปเดต label ก่อน
+        self.label.configure(text=self.controller.advice)
+        
+        # เตรียมและเล่น TTS ใน thread แยกเพื่อไม่ให้ UI ค้าง
+        def prepare_and_play_tts():
+            try:
+                # ตรวจสอบว่าไฟล์ TTS มีอยู่แล้วหรือไม่ (ถูกสร้างไว้แล้วใน save_and_go_home)
+                if not os.path.exists("thai_voice.mp3"):
+                    # ถ้าไม่มีให้สร้างใหม่
+                    tts = gTTS(text=self.controller.advice, lang='th')
+                    tts.save("thai_voice.mp3")
+
+                with self.cleanup_lock:
+                     # เตรียม mixer
+                    if not mixer.get_init():
+                        mixer.init()
+
+                    if mixer.music.get_busy():
+                        mixer.music.stop()
+
+                    # โหลดและเล่นเสียง
+                    mixer.music.load("thai_voice.mp3")
+                    mixer.music.play()
+                
+                # ซ่อนหน้า loading หลังจากเตรียมข้อมูลเสร็จแล้ว (รอสักครู่เพื่อให้ mixer โหลดไฟล์เสร็จ)
+                time.sleep(0.2)  # รอให้ mixer โหลดไฟล์เสร็จ
+                self.controller.after(0, self.controller.hide_loading)
+
+                def delete_file_thread():
+                    # Wait for music to finish
+                    while True:
+                        with self.cleanup_lock:
+                             if not mixer.get_init() or not mixer.music.get_busy():
+                                 break
+                        time.sleep(0.1)
+                    
+                    # Cleanup once finished
+                    self.cleanup_audio()
+
+                threading.Thread(target=delete_file_thread, daemon=True).start()
+            except Exception as e:
+                print(f"เกิดข้อผิดพลาดในการเตรียม TTS: {e}")
+                # แม้เกิดข้อผิดพลาดก็ซ่อน loading
+                self.controller.after(0, self.controller.hide_loading)
+        
+        # เริ่มเตรียม TTS ใน thread แยก
+        threading.Thread(target=prepare_and_play_tts, daemon=True).start()    
+
+    def stop_and_go_home(self):
+        # Run cleanup immediately (will wait for lock if currently being used)
+        self.cleanup_audio()
+        self.controller.show_frame(HomePage)
 
          
         
