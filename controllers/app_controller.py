@@ -440,15 +440,137 @@ class AppController(ctk.CTk):
         # --- END: โค้ดใหม่ ---
 
 
-        # 6. ตรวจสอบเพื่อ Sync ข้อมูล (โค้ดเดิมของคุณ)
-        if old_status == "offline" and new_status == "online":
-            print("✅ Network is BACK ONLINE. Checking for offline tasks to sync...")
-            # เริ่มการซิงค์ใน Thread แยก เพื่อไม่ให้ UI ค้าง
-            threading.Thread(target=self.sync_offline_tasks, daemon=True).start()
+        # 6. แสดง popup เมื่อเปลี่ยนสถานะ
+        if old_status != new_status:
+            if new_status == "offline":
+                # แสดง popup เมื่อเปลี่ยนเป็น offline
+                self.after(0, lambda: self.show_network_status_popup(
+                    "⚠️ ระบบออฟไลน์",
+                    "ระบบอยู่ในโหมดออฟไลน์\nข้อมูลจะถูกบันทึกไว้ในเครื่อง\nและจะ sync ขึ้นระบบเมื่อกลับมาออนไลน์",
+                    is_offline=True
+                ))
+            elif new_status == "online" and old_status == "offline":
+                # แสดง popup เมื่อกลับมาออนไลน์และกำลัง sync
+                print("✅ Network is BACK ONLINE. Checking for offline tasks to sync...")
+                self.after(0, lambda: self.show_network_status_popup(
+                    "🔄 กำลัง Sync ข้อมูล",
+                    "ระบบกลับมาออนไลน์แล้ว\nกำลัง sync ข้อมูลที่บันทึกไว้ในเครื่องขึ้นระบบ...",
+                    is_syncing=True
+                ))
+                # เริ่มการซิงค์ใน Thread แยก เพื่อไม่ให้ UI ค้าง
+                threading.Thread(target=self.sync_offline_tasks, daemon=True).start()
+    def show_network_status_popup(self, title, message, is_offline=False, is_syncing=False):
+        """
+        แสดง popup สำหรับสถานะ network (offline/online/syncing)
+        
+        Args:
+            title: หัวข้อ popup
+            message: ข้อความที่จะแสดง
+            is_offline: True ถ้าเป็น offline mode
+            is_syncing: True ถ้ากำลัง sync ข้อมูล
+        """
+        try:
+            # ปิด popup เก่าถ้ามี
+            if hasattr(self, '_network_status_popup') and self._network_status_popup:
+                try:
+                    self._network_status_popup.destroy()
+                except:
+                    pass
+            
+            # สร้าง popup ใหม่
+            popup = ctk.CTkToplevel(self)
+            popup.title(title)
+            popup.geometry("500x250")
+            
+            # ตั้งค่าสีตามสถานะ
+            if is_offline:
+                bg_color = "#FF9800"  # สีส้มสำหรับ offline
+                text_color = "white"
+            elif is_syncing:
+                bg_color = "#2196F3"  # สีน้ำเงินสำหรับ syncing
+                text_color = "white"
+            else:
+                bg_color = "#4CAF50"  # สีเขียวสำหรับ online
+                text_color = "white"
+            
+            popup.configure(fg_color=bg_color)
+            popup.transient(self)
+            popup.attributes('-topmost', True)
+            
+            # หัวข้อ
+            title_label = ctk.CTkLabel(
+                popup,
+                text=title,
+                font=("TH Sarabun New", 28, "bold"),
+                text_color=text_color,
+                fg_color="transparent"
+            )
+            title_label.pack(pady=(20, 10))
+            
+            # ข้อความ
+            message_label = ctk.CTkLabel(
+                popup,
+                text=message,
+                font=("TH Sarabun New", 20),
+                text_color=text_color,
+                fg_color="transparent",
+                wraplength=450,
+                justify="center"
+            )
+            message_label.pack(pady=10, padx=20)
+            
+            # ปุ่มปิด (สำหรับ offline เท่านั้น)
+            if is_offline:
+                close_btn = ctk.CTkButton(
+                    popup,
+                    text="ปิด",
+                    command=popup.destroy,
+                    fg_color="#FFFFFF",
+                    hover_color="#E0E0E0",
+                    text_color=bg_color,
+                    font=("TH Sarabun New", 18, "bold"),
+                    width=100,
+                    height=40
+                )
+                close_btn.pack(pady=15)
+            elif is_syncing:
+                # สำหรับ syncing จะปิดอัตโนมัติเมื่อ sync เสร็จ
+                pass
+            
+            # เก็บ reference
+            self._network_status_popup = popup
+            
+            # ถ้าเป็น syncing จะปิดอัตโนมัติเมื่อ sync เสร็จ (จะปิดใน sync_offline_tasks)
+            # ถ้าเป็น offline จะปิดเมื่อผู้ใช้กดปุ่มหรือหลังจาก 5 วินาที
+            if is_offline:
+                self.after(5000, lambda: self._close_network_popup_safely())
+            
+        except Exception as e:
+            print(f"Error showing network status popup: {e}")
+    
+    def _close_network_popup_safely(self):
+        """ปิด network status popup อย่างปลอดภัย"""
+        try:
+            if hasattr(self, '_network_status_popup') and self._network_status_popup:
+                self._network_status_popup.destroy()
+                self._network_status_popup = None
+        except Exception as e:
+            print(f"Error closing network popup: {e}")
+
     def sync_offline_tasks(self):
         QUEUE_FILE = "offline_schedule_queue.json"
         
         if not os.path.exists(QUEUE_FILE):
+            # ถ้าไม่มีไฟล์ queue ให้ปิด popup syncing
+            self.after(0, lambda: self._close_network_popup_safely())
+            self.after(0, lambda: self.show_network_status_popup(
+                "✅ ระบบออนไลน์",
+                "ระบบกลับมาออนไลน์แล้ว\nไม่มีข้อมูลที่ต้อง sync",
+                is_offline=False,
+                is_syncing=False
+            ))
+            # ปิด popup หลังจาก 3 วินาที
+            self.after(3000, lambda: self._close_network_popup_safely())
             return
 
 
@@ -560,12 +682,35 @@ class AppController(ctk.CTk):
             with open(QUEUE_FILE, "w", encoding="utf-8") as f:
                 json.dump(remaining_tasks, f, indent=4)
             
+            # ปิด popup syncing และแสดงผลลัพธ์
+            self.after(0, lambda: self._close_network_popup_safely())
+            
             # แจ้งเตือนใน UI (ต้องใช้ self.after เพื่อให้รันใน Main Thread)
             if synced_count > 0:
                 print(f"Sync: ซิงค์สำเร็จ {synced_count} รายการ")
+                # แสดง popup แจ้งผลลัพธ์
+                self.after(0, lambda: self.show_network_status_popup(
+                    "✅ Sync สำเร็จ",
+                    f"ซิงค์ข้อมูล {synced_count} รายการสำเร็จ",
+                    is_offline=False,
+                    is_syncing=False
+                ))
+                # ปิด popup หลังจาก 3 วินาที
+                self.after(3000, lambda: self._close_network_popup_safely())
+                
+                # แสดง notification ด้วย
                 self.after(0, lambda: self.notifier.show_notification(
                     f"ซิงค์ข้อมูล {synced_count} รายการสำเร็จ", success=True
                 ))
+            else:
+                # ถ้าไม่มีข้อมูลที่ sync ได้
+                self.after(0, lambda: self.show_network_status_popup(
+                    "✅ ระบบออนไลน์",
+                    "ระบบกลับมาออนไลน์แล้ว",
+                    is_offline=False,
+                    is_syncing=False
+                ))
+                self.after(3000, lambda: self._close_network_popup_safely())
             
             if len(remaining_tasks) > 0:
                 print(f"Sync: {len(remaining_tasks)} task ยังคงค้างอยู่ในคิว")
@@ -666,6 +811,11 @@ class AppController(ctk.CTk):
                     if notification_type == "save_history_failed":
                         # บันทึกประวัติการจ่ายยาล้มเหลว
                         self._save_medicine_history("failed")
+                        return
+                    
+                    if notification_type == "save_history_success":
+                        # บันทึกประวัติการจ่ายยาสำเร็จ (สำหรับ instant dispense)
+                        self._save_medicine_history("success")
                         return
                     
                     if notification_type == "trigger_sos_call":
@@ -775,9 +925,12 @@ class AppController(ctk.CTk):
                 self._auto_sos_in_progress = False
 
         threading.Thread(target=_auto_sos_thread, daemon=True).start()
-    def _get_medicines_for_current_time(self):
+    def _get_medicines_for_current_time(self, fallback_to_all=False):
         """
         ดึง medicine_id จาก schedule ที่ตรงกับเวลาปัจจุบัน
+        
+        Args:
+            fallback_to_all: ถ้า True และไม่พบ schedule ที่ตรงกับเวลา จะดึงยาทั้งหมดจาก schedule ทั้งหมด
         
         Returns:
             list: array ของ medicine_id (สูงสุด 4 ตัว) หรือ [] ถ้าไม่พบ
@@ -810,7 +963,8 @@ class AppController(ctk.CTk):
                 with self.medicine_data_lock:
                     for med in self.cached_medications:
                         if 'medicine_name' in med and 'medicine_id' in med:
-                            medicine_name_to_id[med['medicine_name']] = med['medicine_id']
+                            medicine_name_name = med['medicine_name']
+                            medicine_name_to_id[medicine_name_name] = med['medicine_id']
             
             if not medicine_name_to_id:
                 print("[Save History] ไม่พบข้อมูลยาใน cached_medications")
@@ -822,11 +976,21 @@ class AppController(ctk.CTk):
             
             medications = meal_data['data']
             medicine_ids = []
+            all_medicine_ids = []  # เก็บยาทั้งหมดจาก schedule ทั้งหมด
             
             for med in medications:
                 schedule_time = med.get('time', '')
                 if not schedule_time:
                     continue
+                
+                # ดึง medicine_id จาก medicine_1 ถึง medicine_4 สำหรับ schedule นี้
+                schedule_med_ids = []
+                for i in range(1, 5):
+                    med_name = med.get(f'medicine_{i}', '')
+                    if med_name and med_name in medicine_name_to_id:
+                        med_id = medicine_name_to_id[med_name]
+                        schedule_med_ids.append(med_id)
+                        all_medicine_ids.append(med_id)  # เก็บไว้สำหรับ fallback
                 
                 # เปรียบเทียบเวลา (รองรับรูปแบบ HH:MM และ HH:MM:SS)
                 schedule_time_clean = schedule_time.split(':')[:2]  # เอาแค่ HH:MM
@@ -834,14 +998,16 @@ class AppController(ctk.CTk):
                 
                 if schedule_time_clean == current_time_clean:
                     # พบ schedule ที่ตรงกับเวลาปัจจุบัน
-                    # ดึง medicine_id จาก medicine_1 ถึง medicine_4
-                    for i in range(1, 5):
-                        med_name = med.get(f'medicine_{i}', '')
-                        if med_name and med_name in medicine_name_to_id:
-                            medicine_ids.append(medicine_name_to_id[med_name])
-                    
+                    medicine_ids = schedule_med_ids
                     # หาเจอแล้ว ให้ return
                     break
+            
+            # ถ้าไม่พบ schedule ที่ตรงกับเวลา และ fallback_to_all = True
+            if not medicine_ids and fallback_to_all and all_medicine_ids:
+                # ใช้ยาทั้งหมดจาก schedule ทั้งหมด (สำหรับกรณี instant dispense)
+                print("[Save History] ไม่พบ schedule ที่ตรงกับเวลา ใช้ยาทั้งหมดจาก schedule")
+                # ลบ duplicates และจำกัดจำนวน
+                medicine_ids = list(dict.fromkeys(all_medicine_ids))[:4]
             
             return medicine_ids[:4]  # จำกัดสูงสุด 4 ตัว
             
@@ -870,7 +1036,8 @@ class AppController(ctk.CTk):
                 return
             
             # ดึง medicine_id จาก schedule ที่ตรงกับเวลาปัจจุบัน
-            medicines = self._get_medicines_for_current_time()
+            # ใช้ fallback_to_all=True เพื่อดึงยาทั้งหมดถ้าไม่พบเวลาที่ตรงกัน (สำหรับ instant dispense)
+            medicines = self._get_medicines_for_current_time(fallback_to_all=True)
             
             if not medicines:
                 print("[Save History] ไม่พบข้อมูลยาสำหรับเวลาปัจจุบัน")

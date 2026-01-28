@@ -1112,6 +1112,11 @@ class MedicationApp(ctk.CTkFrame):
             with open(CACHE_FILE, "w", encoding="utf-8") as f:
                 json.dump(new_cache_data, f, indent=4)
             print(f"Meds (App): Updated {CACHE_FILE} cache successfully.")
+            
+            # 4. อัพเดท last_known_schedule_data ใน controller เพื่อให้การบันทึกประวัติทำงานได้ทันที
+            if hasattr(self.controller, 'last_known_schedule_data'):
+                self.controller.last_known_schedule_data = {'data': new_cache_data}
+                print(f"Meds (App): Updated controller.last_known_schedule_data")
         except Exception as e:
             print(f"Meds (App): Failed to write {CACHE_FILE}: {e}")        
     def on_show(self):

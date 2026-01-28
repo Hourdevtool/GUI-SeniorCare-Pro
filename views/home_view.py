@@ -2109,6 +2109,14 @@ class HomePage(ctk.CTkFrame):
     def update_datetime(self):
         """อัพเดทวันที่และเวลาพร้อมเอฟเฟ็กต์ (Robust Version)"""
         try:
+            # ตรวจสอบว่า widget ยังมีอยู่หรือไม่
+            if not self.winfo_exists():
+                return
+                
+            # ตรวจสอบว่า date_label และ time_label ยังมีอยู่
+            if not hasattr(self, 'date_label') or not hasattr(self, 'time_label'):
+                return
+                
             # 1. พยายามดึงเวลาจากบอร์ดก่อน
             current_dt = self._get_board_time()
             
@@ -2132,34 +2140,51 @@ class HomePage(ctk.CTkFrame):
             year = current_dt.year + 543  # แปลงเป็น พ.ศ.
             
             date_text = f"{day_name} {day} {month} {year}"
-            if self.date_label.cget("text") != date_text:
-                 self.date_label.configure(text=date_text)
+            try:
+                if self.date_label.winfo_exists():
+                    if self.date_label.cget("text") != date_text:
+                        self.date_label.configure(text=date_text)
+            except Exception:
+                pass  # Widget ถูกลบแล้ว ไม่ต้องแสดง error
 
             # จัดรูปแบบเวลาพร้อมวินาที
             current_time_str = current_dt.strftime("%H:%M:%S")
-            self.time_label.configure(text=current_time_str)
-            
-            # เปลี่ยนสีของเวลาตามช่วงเวลา
-            hour = current_dt.hour
-            if 6 <= hour < 12:
-                time_color = "#DC0000"  # สีส้ม (เช้า)
-            elif 12 <= hour < 18:
-                time_color = "#F4B342"  # สีเหลือง (บ่าย)
-            elif 18 <= hour < 22:
-                time_color = "#C47BE4"  # สีม่วง (เย็น)
-            else:
-                time_color = "#301CA0"  # สีเข้ม (กลางคืน)
-                
-            self.time_label.configure(text_color=time_color)
+            try:
+                if self.time_label.winfo_exists():
+                    self.time_label.configure(text=current_time_str)
+                    
+                    # เปลี่ยนสีของเวลาตามช่วงเวลา
+                    hour = current_dt.hour
+                    if 6 <= hour < 12:
+                        time_color = "#DC0000"  # สีส้ม (เช้า)
+                    elif 12 <= hour < 18:
+                        time_color = "#F4B342"  # สีเหลือง (บ่าย)
+                    elif 18 <= hour < 22:
+                        time_color = "#C47BE4"  # สีม่วง (เย็น)
+                    else:
+                        time_color = "#301CA0"  # สีเข้ม (กลางคืน)
+                        
+                    self.time_label.configure(text_color=time_color)
+            except Exception:
+                pass  # Widget ถูกลบแล้ว ไม่ต้องแสดง error
             
             # อัพเดทสถานะระบบ (Safe call)
-            self.update_system_status()
+            try:
+                self.update_system_status()
+            except Exception:
+                pass
             
             # เช็ค Network แบบ Non-blocking
-            self.check_network_and_update_buttons()
+            try:
+                self.check_network_and_update_buttons()
+            except Exception:
+                pass
             
         except Exception as e:
-            print(f"Error in update_datetime: {e}")
+            # ไม่แสดง error สำหรับ widget ที่ถูกลบแล้ว
+            import tkinter
+            if not isinstance(e, tkinter.TclError) or "invalid command name" not in str(e):
+                print(f"Error in update_datetime: {e}")
             
         finally:
             # สำคัญ: เรียกตัวเองซ้ำเสมอ ไม่ว่าจะเกิด error หรือไม่
@@ -2167,7 +2192,7 @@ class HomePage(ctk.CTkFrame):
             try:
                 if self.winfo_exists():
                     self.after(1000, self.update_datetime)
-            except:
+            except Exception:
                 pass
 
     def update_system_status(self):
@@ -2259,6 +2284,13 @@ class HomePage(ctk.CTkFrame):
         
         self.medication_labels.extend([error_card, error_label])
     def check_network_and_update_buttons(self):
+        # ตรวจสอบว่า widget ยังมีอยู่หรือไม่
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+            
         current_status = "online" # ค่าเริ่มต้น
         try:
             current_status = self.controller.network_status_var.get()
@@ -2289,6 +2321,9 @@ class HomePage(ctk.CTkFrame):
                 
                 for i, btn in self.menu_buttons.items():
                     try:
+                        # ตรวจสอบว่า widget ยังมีอยู่
+                        if not btn.winfo_exists():
+                            continue
                         btn_text = btn.cget("text")
                         if btn_text in allowed_buttons:
                             # เปิดใช้งานปุ่มที่อนุญาต
@@ -2311,109 +2346,150 @@ class HomePage(ctk.CTkFrame):
                                 border_color="#BDBDBD"
                             )
                     except Exception as e:
-                        print(f"Error updating button {i}: {e}")
+                        # ไม่แสดง error สำหรับ widget ที่ถูกลบแล้ว
+                        import tkinter
+                        if not isinstance(e, tkinter.TclError) or "invalid command name" not in str(e):
+                            print(f"Error updating button {i}: {e}")
                 # อัปเดตปุ่ม SOS ให้เป็นสีเทาและเปลี่ยนรูปเป็นออฟไลน์
                 if hasattr(self, 'call_button') and self.call_button:
-                    self.call_button.configure(
-                        state="disabled",
-                        image=self.call_photo_offline,  # เปลี่ยนรูปเป็นออฟไลน์
-                        fg_color="#B0B0B0",  # สีเทาอ่อน
-                        hover_color="#B0B0B0",  # สีเทาอ่อน
-                        border_color="#9E9E9E",  # เส้นขอบเทา
-                        bg_color="#8acaef"  # เก็บ bg_color เดิม
-                    )
+                    try:
+                        if self.call_button.winfo_exists():
+                            self.call_button.configure(
+                                state="disabled",
+                                image=self.call_photo_offline,  # เปลี่ยนรูปเป็นออฟไลน์
+                                fg_color="#B0B0B0",  # สีเทาอ่อน
+                                hover_color="#B0B0B0",  # สีเทาอ่อน
+                                border_color="#9E9E9E",  # เส้นขอบเทา
+                                bg_color="#8acaef"  # เก็บ bg_color เดิม
+                            )
+                    except Exception:
+                        pass  # Widget ถูกลบแล้ว
                 
                 # อัปเดตปุ่มรีเฟรชและรีเซ็ตให้เป็นสีเทาและกดไม่ได้
                 if hasattr(self, 'setting_button') and self.setting_button:
-                    # คืนค่าสไตล์เดิมถ้ามี
-                    if hasattr(self, 'setting_button_original_style'):
-                        style = self.setting_button_original_style
-                        self.setting_button.configure(
-                            state="normal",
-                            fg_color=style['fg_color'],
-                            hover_color=style['hover_color'],
-                            text_color=style['text_color']
-                        )
-                    else:
-                        self.setting_button.configure(state="normal")
+                    try:
+                        if self.setting_button.winfo_exists():
+                            # คืนค่าสไตล์เดิมถ้ามี
+                            if hasattr(self, 'setting_button_original_style'):
+                                style = self.setting_button_original_style
+                                self.setting_button.configure(
+                                    state="normal",
+                                    fg_color=style['fg_color'],
+                                    hover_color=style['hover_color'],
+                                    text_color=style['text_color']
+                                )
+                            else:
+                                self.setting_button.configure(state="normal")
+                    except Exception:
+                        pass
                 
                 if hasattr(self, 'refresh_button') and self.refresh_button:
-                    if hasattr(self, 'refresh_button_original_style'):
-                        style = self.refresh_button_original_style
-                        self.refresh_button.configure(
-                            state="normal",
-                            fg_color=style['fg_color'],
-                            hover_color=style['hover_color'],
-                            text_color=style['text_color']
-                        )
-                    else:
-                        self.refresh_button.configure(state="normal")
+                    try:
+                        if self.refresh_button.winfo_exists():
+                            if hasattr(self, 'refresh_button_original_style'):
+                                style = self.refresh_button_original_style
+                                self.refresh_button.configure(
+                                    state="normal",
+                                    fg_color=style['fg_color'],
+                                    hover_color=style['hover_color'],
+                                    text_color=style['text_color']
+                                )
+                            else:
+                                self.refresh_button.configure(state="normal")
+                    except Exception:
+                        pass
                 
                 if hasattr(self, 'reset_counter_button') and self.reset_counter_button:
-                    if hasattr(self, 'reset_counter_button_original_style'):
-                        style = self.reset_counter_button_original_style
-                        self.reset_counter_button.configure(
-                            state="normal",
-                            fg_color=style['fg_color'],
-                            hover_color=style['hover_color'],
-                            text_color=style['text_color']
-                        )
-                    else:
-                        self.reset_counter_button.configure(state="normal")
+                    try:
+                        if self.reset_counter_button.winfo_exists():
+                            if hasattr(self, 'reset_counter_button_original_style'):
+                                style = self.reset_counter_button_original_style
+                                self.reset_counter_button.configure(
+                                    state="normal",
+                                    fg_color=style['fg_color'],
+                                    hover_color=style['hover_color'],
+                                    text_color=style['text_color']
+                                )
+                            else:
+                                self.reset_counter_button.configure(state="normal")
+                    except Exception:
+                        pass
             else:
                 # --- เน็ตออนไลน์: คืนค่าปุ่มเป็นปกติ ---
                 print("HomePage: Network is ONLINE, enabling buttons.")
                 for i, btn in self.menu_buttons.items():
-                    if i in self.button_original_styles:
-                        style = self.button_original_styles[i]
-                        btn.configure(
-                            state="normal",
-                            fg_color=style['fg_color'],
-                            hover_color=style['hover_color'],
-                            text_color=style['text_color'],
-                            border_color=style['border_color']
-                        )
+                    try:
+                        if not btn.winfo_exists():
+                            continue
+                        if i in self.button_original_styles:
+                            style = self.button_original_styles[i]
+                            btn.configure(
+                                state="normal",
+                                fg_color=style['fg_color'],
+                                hover_color=style['hover_color'],
+                                text_color=style['text_color'],
+                                border_color=style['border_color']
+                            )
+                    except Exception:
+                        pass  # Widget ถูกลบแล้ว
+                        
                 # คืนค่าปุ่ม SOS เป็นสไตล์เดิมและเปลี่ยนรูปกลับเป็นออนไลน์
                 if hasattr(self, 'call_button') and self.call_button and self.call_button_original_style:
-                    style = self.call_button_original_style
-                    self.call_button.configure(
-                        state=style['state'],
-                        image=self.call_photo_online,  # เปลี่ยนรูปกลับเป็นออนไลน์
-                        fg_color=style['fg_color'],
-                        hover_color=style['hover_color'],
-                        bg_color=style['bg_color'],
-                        border_color=style['border_color'],
-                        border_width=style['border_width'],
-                        corner_radius=style.get('corner_radius', 0)
-                    )
+                    try:
+                        if self.call_button.winfo_exists():
+                            style = self.call_button_original_style
+                            self.call_button.configure(
+                                state=style['state'],
+                                image=self.call_photo_online,  # เปลี่ยนรูปกลับเป็นออนไลน์
+                                fg_color=style['fg_color'],
+                                hover_color=style['hover_color'],
+                                bg_color=style['bg_color'],
+                                border_color=style['border_color'],
+                                border_width=style['border_width'],
+                                corner_radius=style.get('corner_radius', 0)
+                            )
+                    except Exception:
+                        pass
                 
                 # คืนค่าปุ่มรีเฟรชและรีเซ็ตเป็นสไตล์เดิม
                 if hasattr(self, 'setting_button') and self.setting_button and hasattr(self, 'setting_button_original_style'):
-                    style = self.setting_button_original_style
-                    self.setting_button.configure(
-                        state=style['state'],
-                        fg_color=style['fg_color'],
-                        hover_color=style['hover_color'],
-                        text_color=style['text_color']
-                    )
+                    try:
+                        if self.setting_button.winfo_exists():
+                            style = self.setting_button_original_style
+                            self.setting_button.configure(
+                                state=style['state'],
+                                fg_color=style['fg_color'],
+                                hover_color=style['hover_color'],
+                                text_color=style['text_color']
+                            )
+                    except Exception:
+                        pass
                 
                 if hasattr(self, 'refresh_button') and self.refresh_button and hasattr(self, 'refresh_button_original_style'):
-                    style = self.refresh_button_original_style
-                    self.refresh_button.configure(
-                        state=style['state'],
-                        fg_color=style['fg_color'],
-                        hover_color=style['hover_color'],
-                        text_color=style['text_color']
-                    )
+                    try:
+                        if self.refresh_button.winfo_exists():
+                            style = self.refresh_button_original_style
+                            self.refresh_button.configure(
+                                state=style['state'],
+                                fg_color=style['fg_color'],
+                                hover_color=style['hover_color'],
+                                text_color=style['text_color']
+                            )
+                    except Exception:
+                        pass
                 
                 if hasattr(self, 'reset_counter_button') and self.reset_counter_button and hasattr(self, 'reset_counter_button_original_style'):
-                    style = self.reset_counter_button_original_style
-                    self.reset_counter_button.configure(
-                        state=style['state'],
-                        fg_color=style['fg_color'],
-                        hover_color=style['hover_color'],
-                        text_color=style['text_color']
-                    )
+                    try:
+                        if self.reset_counter_button.winfo_exists():
+                            style = self.reset_counter_button_original_style
+                            self.reset_counter_button.configure(
+                                state=style['state'],
+                                fg_color=style['fg_color'],
+                                hover_color=style['hover_color'],
+                                text_color=style['text_color']
+                            )
+                    except Exception:
+                        pass
 
     def on_video_call_click(self):
         # ตรวจสอบว่าปุ่มถูกกดไปแล้วหรือไม่
@@ -2474,93 +2550,7 @@ class HomePage(ctk.CTkFrame):
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             self.controller.notifier.show_notification(f"เกิดข้อผิดพลาด: {e}", success=False)
-            self.controller.hide_loading() 
-
-# Other frames moved to their respective view files
-        page_title.pack(side="left", padx=20)
-        self.reply_ctk_image = ctk.CTkImage(
-            light_image=Image.open(f"{PATH}image/reply.png").resize((24, 24)), 
-            size=(24, 24)
-        )
-
-        back_button = ctk.CTkButton(
-            navbar,
-           image=self.reply_ctk_image,   # ใช้ image แทน text
-            text="ย้อนกลับ",                      # ไม่ใส่ข้อความ
-            width=100, 
-            height=50, 
-            corner_radius=25,
-            fg_color="#2563EB", 
-            hover_color="#1D3557", 
-            text_color="white",
-            font=("Arial", 24, "bold"), 
-            command=lambda: controller.show_frame(HomePage)
-        )
-        back_button.pack(side="right", padx=10, pady=5)
-
-        add_button = ctk.CTkButton(
-            navbar,
-            text="เพิ่มข้อมูล",
-            width=120,
-            height=50,
-            corner_radius=20,
-            fg_color="#2563EB",
-            hover_color="#05C766",
-            text_color="white",
-            font=("Arial", 20, "bold"),
-            command=lambda: controller.show_frame(add_Frame)
-        )
-        add_button.pack(side="right", padx=10, pady=10)
-
-        # กรอบใหญ่
-        self.outer_frame = ctk.CTkFrame(
-            self,
-            width=700,
-            height=400,
-            fg_color="#FFFFFF",
-            corner_radius=0,
-        )
-        self.outer_frame.place(relx=0.5, rely=0.5, anchor="center")
-        #pywinstyles.set_opacity(self.outer_frame, value=0.9,color="#000001")
-
-        # Scrollable Frame ภายใน
-        self.scrollable_frame = ctk.CTkScrollableFrame(
-            self.outer_frame,
-            width=650,
-            height=350,
-            fg_color="#FFFFFF",
-            corner_radius=15
-        )
-        self.scrollable_frame.place(relx=0.5, rely=0.5, anchor="center")
-
-        # ▶️ เพิ่มข้อความบนสุด
-        self.title_label = ctk.CTkLabel(
-            self.scrollable_frame,
-            text="ชนิดยา",
-            font=("TH Sarabun New", 32, "bold"),
-            text_color="black",
-            fg_color="transparent"
-        )
-        self.title_label.pack(pady=(20, 10))  # ระยะห่างบน-ล่างของข้อความ
-
-        # ▶️ ปรับ Scrollbar สี
-        self.scrollable_frame._scrollbar.configure(
-            fg_color="#ffffff",
-            button_color="#2563EB",
-            bg_color="#FFFFFF",
-            button_hover_color="#05C766"
-        )
-        #pywinstyles.set_opacity(self.scrollable_frame._scrollbar, value=1, color="#FFFFFF")
-
-        # Sub Frame สำหรับรายการยา
-        self.sub_frame = ctk.CTkFrame(
-            self.scrollable_frame,
-            fg_color="#FFFFFF",
-            width=900,
-            corner_radius=20,
-            bg_color="transparent"
-        )
-        self.sub_frame.pack(padx=20, pady=10, expand=True, fill="both")
+            self.controller.hide_loading()
 
     def go_to_add(self):
         threading.Thread(target=lambda: subprocess.Popen(["python", "Frame2-add.py"])).start()

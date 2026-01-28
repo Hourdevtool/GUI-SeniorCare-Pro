@@ -3,6 +3,9 @@ import requests
 import random
 import string
 import time
+import os
+import platform
+import shutil
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
@@ -15,6 +18,89 @@ from lib.alert import sendtoLine
 from flexmessage.sosalert import generateflexmessage
 
 KIOSK_NAME = "เครื่องจ่ายยาอัตโนมัติ"
+
+
+def find_firefox_binary():
+    """
+    หา Firefox binary path อัตโนมัติ
+    รองรับทั้ง Windows และ Linux (Raspberry Pi)
+    """
+    possible_paths = []
+    
+    # สำหรับ Linux/Raspberry Pi
+    if platform.system() != "Windows":
+        possible_paths.extend([
+            "/usr/bin/firefox",
+            "/usr/bin/firefox-esr",
+            "/usr/local/bin/firefox",
+            "/opt/firefox/firefox",
+            os.path.expanduser("~/firefox/firefox"),
+            shutil.which("firefox"),  # ตรวจสอบใน PATH
+            shutil.which("firefox-esr"),
+        ])
+    else:
+        # สำหรับ Windows
+        possible_paths.extend([
+            "firefox.exe",
+            shutil.which("firefox.exe"),
+            # Windows default locations
+            os.path.join(os.environ.get("ProgramFiles", ""), "Mozilla Firefox", "firefox.exe"),
+            os.path.join(os.environ.get("ProgramFiles(x86)", ""), "Mozilla Firefox", "firefox.exe"),
+        ])
+    
+    # ลบ None ออกจาก list
+    possible_paths = [p for p in possible_paths if p]
+    
+    # ตรวจสอบว่า path ไหนมีไฟล์อยู่จริง
+    for path in possible_paths:
+        if path and os.path.isfile(path) and os.access(path, os.X_OK):
+            print(f"พบ Firefox binary ที่: {path}")
+            return path
+    
+    # ถ้าหาไม่เจอ
+    print("ไม่พบ Firefox binary ใน path ที่กำหนด")
+    return None
+
+
+def find_geckodriver():
+    """
+    หา geckodriver path อัตโนมัติ
+    รองรับทั้ง Windows และ Linux (Raspberry Pi)
+    """
+    # รายการ path ที่อาจมี geckodriver
+    possible_paths = []
+    
+    # สำหรับ Linux/Raspberry Pi
+    if platform.system() != "Windows":
+        possible_paths.extend([
+            "/usr/bin/geckodriver",
+            "/usr/local/bin/geckodriver",
+            "/opt/geckodriver/geckodriver",
+            os.path.expanduser("~/geckodriver"),
+            os.path.expanduser("~/.local/bin/geckodriver"),
+            shutil.which("geckodriver"),  # ตรวจสอบใน PATH
+        ])
+    else:
+        # สำหรับ Windows
+        possible_paths.extend([
+            "geckodriver.exe",
+            os.path.join(os.getcwd(), "geckodriver.exe"),
+            os.path.expanduser("~/geckodriver.exe"),
+            shutil.which("geckodriver.exe"),
+        ])
+    
+    # ลบ None ออกจาก list
+    possible_paths = [p for p in possible_paths if p]
+    
+    # ตรวจสอบว่า path ไหนมีไฟล์อยู่จริง
+    for path in possible_paths:
+        if path and os.path.isfile(path) and os.access(path, os.X_OK):
+            print(f"พบ geckodriver ที่: {path}")
+            return path
+    
+    # ถ้าหาไม่เจอ ให้ลองใช้ webdriver-manager หรือให้ Selenium หาเอง
+    print("ไม่พบ geckodriver ใน path ที่กำหนด กำลังลองใช้ Selenium auto-detection...")
+    return None  # ให้ Selenium หาเอง
 
 
 def generate_random_room():
@@ -42,11 +128,46 @@ def press_sos_automation(token, group_id):
         options.set_preference("permissions.default.camera", 1)
         options.set_preference("dom.disable_open_during_load", False)
 
+        # หา Firefox binary path
+        firefox_binary_path = find_firefox_binary()
+        if firefox_binary_path:
+            options.binary_location = firefox_binary_path
+        else:
+            print("คำเตือน: ไม่พบ Firefox binary จะลองใช้ default path")
+
         # -------------------------
         # 📌 2) Open Firefox
         # -------------------------
-        service = Service("/usr/bin/geckodriver")
-        driver = webdriver.Firefox(service=service, options=options)
+        geckodriver_path = find_geckodriver()
+        
+        if geckodriver_path:
+            service = Service(geckodriver_path)
+            driver = webdriver.Firefox(service=service, options=options)
+        else:
+            # ถ้าหา geckodriver ไม่เจอ ให้ Selenium หาเอง (ต้องติดตั้ง webdriver-manager)
+            try:
+                # ลองใช้ webdriver-manager ถ้ามี
+                from webdriver_manager.firefox import GeckoDriverManager
+                service = Service(GeckoDriverManager().install())
+                driver = webdriver.Firefox(service=service, options=options)
+            except ImportError:
+                # ถ้าไม่มี webdriver-manager ให้ลองใช้โดยไม่ระบุ path
+                # Selenium จะพยายามหา geckodriver ใน PATH
+                try:
+                    driver = webdriver.Firefox(options=options)
+                except WebDriverException as e:
+                    error_msg = (
+                        "ไม่พบ geckodriver หรือ Firefox!\n\n"
+                        "วิธีแก้ไข:\n"
+                        "1. ติดตั้ง Firefox:\n"
+                        "   - Linux/Raspberry Pi: sudo apt-get install firefox-esr\n"
+                        "2. ติดตั้ง geckodriver:\n"
+                        "   - Linux/Raspberry Pi: sudo apt-get install firefox-geckodriver\n"
+                        "   - หรือดาวน์โหลดจาก: https://github.com/mozilla/geckodriver/releases\n"
+                        "3. หรือติดตั้ง webdriver-manager:\n"
+                        "   pip install webdriver-manager\n"
+                    )
+                    raise WebDriverException(error_msg) from e
 
         # -------------------------
         # 📌 3) เปิดที่หน้าจอทันที (ไม่ซ่อน)

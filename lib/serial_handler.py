@@ -652,6 +652,12 @@ def start_Serial_loop(
                                                 "status_complete",
                                                 message
                                             )
+                                            # บันทึกประวัติการจ่ายยาสำเร็จ
+                                            notification_callback(
+                                                "save_history_success",
+                                                f"status_complete_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                                                None
+                                            )
                                         except Exception as e:
                                             print(f"Error sending success notification: {e}")
                                 
