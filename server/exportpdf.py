@@ -3,13 +3,40 @@ from playwright.async_api import async_playwright
 import tempfile
 import os
 import subprocess
+import shutil
 
 heartpdf_file = os.path.join(tempfile.gettempdir(), "heart_report.pdf")
 historypdf_file = os.path.join(tempfile.gettempdir(), "history_report.pdf")
 
+def get_chromium_path():
+    """Finds the system-installed Chromium path on Linux/Raspberry Pi."""
+    if os.name != 'nt':  # Linux
+        # Common paths for Chromium on Raspberry Pi OS / Linux
+        paths = [
+            "/usr/bin/chromium-browser",
+            "/usr/bin/chromium",
+            "/snap/bin/chromium"
+        ]
+        for path in paths:
+            if os.path.exists(path):
+                return path
+        # Fallback to checking PATH
+        return shutil.which("chromium-browser") or shutil.which("chromium")
+    return None
+
 async def generateheart_pdf(id):
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        launch_kwargs = {"headless": True}
+        
+        # Check for system chromium on Linux to avoid ARM64 crashes
+        executable_path = get_chromium_path()
+        if executable_path:
+            print(f"Using system Chromium at: {executable_path}")
+            launch_kwargs["executable_path"] = executable_path
+            # System browser might need extra args to run in some envs
+            launch_kwargs["args"] = ["--no-sandbox", "--disable-setuid-sandbox"]
+
+        browser = await p.chromium.launch(**launch_kwargs)
         page = await browser.new_page()
 
         await page.goto(f"http://medic.ctnphrae.com/heart_report.php?id={id}", wait_until="load", timeout=60000)
@@ -24,7 +51,16 @@ async def generateheart_pdf(id):
 
 async def generahistory_pdf(id):
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        launch_kwargs = {"headless": True}
+        
+        # Check for system chromium on Linux
+        executable_path = get_chromium_path()
+        if executable_path:
+            print(f"Using system Chromium at: {executable_path}")
+            launch_kwargs["executable_path"] = executable_path
+            launch_kwargs["args"] = ["--no-sandbox", "--disable-setuid-sandbox"]
+
+        browser = await p.chromium.launch(**launch_kwargs)
         page = await browser.new_page()
 
         await page.goto(f"http://medic.ctnphrae.com/history.php?id={id}", wait_until="load", timeout=60000)
